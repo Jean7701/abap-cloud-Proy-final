@@ -9,6 +9,7 @@
     <CLIDEP>X</CLIDEP>
     <DDTEXT>Stores the basic information about work orders</DDTEXT>
     <MASTERLANG>E</MASTERLANG>
+    <MAINFLAG>X</MAINFLAG>
     <CONTFLAG>A</CONTFLAG>
     <EXCLASS>1</EXCLASS>
    </DD02V>
