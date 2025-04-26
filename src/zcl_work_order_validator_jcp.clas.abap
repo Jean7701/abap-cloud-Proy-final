@@ -4,12 +4,13 @@ CLASS zcl_work_order_validator_jcp DEFINITION
   CREATE PUBLIC .
 
   PUBLIC SECTION.
-    INTERFACES if_oo_adt_classrun.
+*    INTERFACES if_oo_adt_classrun.
 
-    METHODS: validate_create_order IMPORTING iv_customer_id   TYPE string
-                                             iv_technician_id TYPE string
-                                             iv_priority      TYPE string
-                                   RETURNING VALUE(rv_valid)  TYPE abap_bool,
+    METHODS:
+     validate_create_order  IMPORTING iv_customer_id    TYPE string
+                                      iv_technician_id  TYPE string
+                                      iv_priority       TYPE string
+                            RETURNING VALUE(rv_valid)   TYPE abap_bool,
 
       validate_update_order IMPORTING iv_work_order_id TYPE string
                                       iv_status        TYPE string
@@ -22,7 +23,6 @@ CLASS zcl_work_order_validator_jcp DEFINITION
       validate_status_and_priority IMPORTING iv_status       TYPE string
                                              iv_priority     TYPE string
                                    RETURNING VALUE(rv_valid) TYPE abap_bool.
-
 
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -41,17 +41,6 @@ ENDCLASS.
 
 CLASS zcl_work_order_validator_jcp IMPLEMENTATION.
 
-  METHOD if_oo_adt_classrun~main.
-    DATA: lv_valid TYPE abap_bool.
-
-    IF lv_valid = abap_true.
-      out->write( '✅ Validación exitosa: Todos los checks pasaron' ).
-    ELSE.
-      out->write( '❌ Validación fallida: Cliente no existe en la base de datos' ).
-    ENDIF.
-
-  ENDMETHOD.
-
   """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
   METHOD validate_create_order.
 
@@ -68,12 +57,6 @@ CLASS zcl_work_order_validator_jcp IMPLEMENTATION.
       rv_valid = abap_false.
       RETURN.
     ENDIF.
-
-    " Check if priority is valid
-*    c_valid_priority = VALUE #(
-*        ( sign = 'I' option = 'EQ' low = 'A' )
-*        ( sign = 'I' option = 'EQ' low = 'B' )
-*      ) .
 
     IF iv_priority NOT IN c_valid_priority.
       rv_valid = abap_false.
@@ -111,11 +94,6 @@ CLASS zcl_work_order_validator_jcp IMPLEMENTATION.
       rv_valid = abap_false.
       RETURN.
     ENDIF.
-
-    c_valid_status = VALUE #(
-         ( sign = 'I' option = 'EQ' low = 'PE' )
-         ( sign = 'I' option = 'EQ' low = 'CO' )
-       ) .
 
     " Check if the order status is editable (e.g., Pending)
     IF iv_status NOT IN c_valid_status.
@@ -175,16 +153,29 @@ CLASS zcl_work_order_validator_jcp IMPLEMENTATION.
 
   """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
   METHOD validate_status_and_priority.
-      c_valid_priority = VALUE #(
-        ( sign = 'I' option = 'EQ' low = 'A' )
-        ( sign = 'I' option = 'EQ' low = 'B' )
+
+  data: lt_priority type standard table of zpriority_jcp.
+  data: lt_status   type standard table of ztstatus_jcp.
+
+  select priority_code, priority_description
+  from zpriority_jcp
+  into table @lt_priority.
+
+  loop at lt_priority assigning FIELD-SYMBOL(<fs_priority>).
+       c_valid_priority = VALUE #(
+        ( sign = 'I' option = 'EQ' low = <fs_priority>-priority_code )
       ) .
+  endloop.
 
+ select status_code, status_description
+  from ztstatus_jcp
+  into table @lt_status.
 
+Loop at lt_status assigning FIELD-SYMBOL(<fs_status>).
     c_valid_status = VALUE #(
-         ( sign = 'I' option = 'EQ' low = 'PE' )
-         ( sign = 'I' option = 'EQ' low = 'CO' )
+         ( sign = 'I' option = 'EQ' low = <fs_status>-status_code )
        ) .
+endloop.
 
     " Validate the status value
     IF iv_status NOT IN c_valid_status.
