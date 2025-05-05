@@ -7,21 +7,22 @@ CLASS zcl_work_order_validator_jcp DEFINITION
 *    INTERFACES if_oo_adt_classrun.
 
     METHODS:
-     validate_create_order  IMPORTING iv_customer_id    TYPE string
-                                      iv_technician_id  TYPE string
-                                      iv_priority       TYPE string
-                            RETURNING VALUE(rv_valid)   TYPE abap_bool,
+      validate_create_order  IMPORTING iv_customer_id   TYPE zecustomer_id
+                                       iv_technician_id TYPE zetechn_id
+                                       iv_status        TYPE zestatus_jcp
+                                       iv_priority      TYPE zepriority_jcp
+                             RETURNING VALUE(rv_valid)  TYPE abap_bool,
 
       validate_update_order IMPORTING iv_work_order_id TYPE string
-                                      iv_status        TYPE string
+                                      iv_status        TYPE zestatus_jcp
                             RETURNING VALUE(rv_valid)  TYPE abap_bool,
 
       validate_delete_order IMPORTING iv_work_order_id TYPE string
-                                      iv_status        TYPE string
+                                      iv_status        TYPE zestatus_jcp
                             RETURNING VALUE(rv_valid)  TYPE abap_bool,
 
-      validate_status_and_priority IMPORTING iv_status       TYPE string
-                                             iv_priority     TYPE string
+      validate_status_and_priority IMPORTING iv_status       TYPE zestatus_jcp
+                                             iv_priority     TYPE zepriority_jcp
                                    RETURNING VALUE(rv_valid) TYPE abap_bool.
 
   PROTECTED SECTION.
@@ -29,9 +30,10 @@ CLASS zcl_work_order_validator_jcp DEFINITION
     DATA: c_valid_status   TYPE RANGE OF ztstatus_jcp-status_code.
     DATA: c_valid_priority TYPE RANGE OF ztpriority_jcp-priority_code.
 
-    METHODS check_customer_exists   IMPORTING iv_customer_id   TYPE string
-                                    RETURNING VALUE(rv_exists) TYPE abap_bool.
-    METHODS check_technician_exists IMPORTING iv_technician_id TYPE string
+    METHODS check_customer_exists   IMPORTING iv_customer_id  TYPE zecustomer_id  "string
+                                    RETURNING VALUE(rv_valid) TYPE abap_bool.
+
+    METHODS check_technician_exists IMPORTING iv_technician_id TYPE zetechn_id "string
                                     RETURNING VALUE(r_result)  TYPE abap_bool.
     METHODS check_order_exists      IMPORTING iv_work_order_id TYPE string
                                     RETURNING VALUE(r_result)  TYPE abap_bool.
@@ -41,29 +43,21 @@ ENDCLASS.
 
 CLASS zcl_work_order_validator_jcp IMPLEMENTATION.
 
-  """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+  """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
   METHOD validate_create_order.
 
     " Check if customer exists
     DATA(lv_customer_exists) = check_customer_exists( iv_customer_id ).
-    IF lv_customer_exists IS INITIAL.
-      rv_valid = abap_false.
-      RETURN.
-    ENDIF.
+    rv_valid = lv_customer_exists.
 
     " Check if technician exists
     DATA(lv_technician_exists) = check_technician_exists( iv_technician_id ).
-    IF lv_technician_exists IS INITIAL.
-      rv_valid = abap_false.
-      RETURN.
-    ENDIF.
+    rv_valid  = lv_technician_exists.
 
-    IF iv_priority NOT IN c_valid_priority.
-      rv_valid = abap_false.
-      RETURN.
-    ENDIF.
+    DATA(rv_valido) = validate_status_and_priority( EXPORTING iv_status = iv_status
+                                                              iv_priority  = iv_priority ).
+    RETURN.
 
-    rv_valid = abap_true.
   ENDMETHOD.
 
 
@@ -74,6 +68,11 @@ CLASS zcl_work_order_validator_jcp IMPLEMENTATION.
     FROM ztcustomer_jcp
     WHERE customer_id EQ @iv_customer_id
        INTO @lv_customer_id .
+    IF sy-subrc EQ 0.
+      rv_valid = abap_true.
+    ELSE.
+      rv_valid = abap_false.
+    ENDIF.
   ENDMETHOD.
 
 
@@ -84,6 +83,11 @@ CLASS zcl_work_order_validator_jcp IMPLEMENTATION.
      FROM zttechnician_jcp
      WHERE technician_id EQ @iv_technician_id
      INTO @lv_technician_id .
+    IF sy-subrc EQ 0.
+      r_result = abap_true.
+    ELSE.
+      r_result = abap_false.
+    ENDIF.
   ENDMETHOD.
 
   """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -154,32 +158,35 @@ CLASS zcl_work_order_validator_jcp IMPLEMENTATION.
   """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
   METHOD validate_status_and_priority.
 
-  data: lt_priority type standard table of zpriority_jcp.
-  data: lt_status   type standard table of ztstatus_jcp.
+    DATA: lt_priority TYPE STANDARD TABLE OF zpriority_jcp.
+    DATA: lt_status   TYPE STANDARD TABLE OF ztstatus_jcp.
 
-  select priority_code, priority_description
-  from zpriority_jcp
-  into table @lt_priority.
+    SELECT priority_code, priority_description
+    FROM zpriority_jcp
+    INTO TABLE @lt_priority.
 
-  loop at lt_priority assigning FIELD-SYMBOL(<fs_priority>).
-       c_valid_priority = VALUE #(
-        ( sign = 'I' option = 'EQ' low = <fs_priority>-priority_code )
-      ) .
-  endloop.
+    LOOP AT lt_priority ASSIGNING FIELD-SYMBOL(<fs_priority>).
+      c_valid_priority = VALUE #(
+       ( sign = 'I' option = 'EQ' low = <fs_priority>-priority_code )
+     ) .
+    ENDLOOP.
 
- select status_code, status_description
-  from ztstatus_jcp
-  into table @lt_status.
+    SELECT status_code, status_description
+     FROM ztstatus_jcp
+     INTO TABLE @lt_status.
 
-Loop at lt_status assigning FIELD-SYMBOL(<fs_status>).
-    c_valid_status = VALUE #(
-         ( sign = 'I' option = 'EQ' low = <fs_status>-status_code )
-       ) .
-endloop.
+    LOOP AT lt_status ASSIGNING FIELD-SYMBOL(<fs_status>).
+      c_valid_status = VALUE #(
+           ( sign = 'I' option = 'EQ' low = <fs_status>-status_code )
+         ) .
+    ENDLOOP.
 
     " Validate the status value
     IF iv_status NOT IN c_valid_status.
       rv_valid = abap_false.
+      RETURN.
+    ELSE.
+      rv_valid = abap_true.
       RETURN.
     ENDIF.
 
@@ -187,9 +194,10 @@ endloop.
     IF iv_priority NOT IN c_valid_priority.
       rv_valid = abap_false.
       RETURN.
+    ELSE.
+      rv_valid = abap_true.
+      RETURN.
     ENDIF.
-
-    rv_valid = abap_true.
 
   ENDMETHOD.
 
