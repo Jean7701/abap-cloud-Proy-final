@@ -92,7 +92,7 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
     out->write( |Userio inicia proceso de Bloqueo | ).
     TRY.
         DATA(lo_locked_object) = cl_abap_lock_object_factory=>get_instance(
-        EXPORTING iv_name = 'ZTWORK_ORDER_JCP' ).
+        EXPORTING iv_name = 'EZ_WRKORD_JCP' ).
 
       CATCH cx_abap_lock_failure.
         out->write( |Bloqueo de objetos instancia no creada| ).
