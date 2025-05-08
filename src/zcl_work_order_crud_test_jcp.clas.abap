@@ -8,7 +8,8 @@ CLASS zcl_work_order_crud_test_jcp DEFINITION
     DATA: mv_timestamp TYPE utclong,
           mv_time      TYPE t.
 
-    DATA: ls_workorder TYPE  ztwork_order_jcp,
+    DATA: ls_workorder TYPE ztwork_order_jcp,
+          ls_histOrd   type ztwrkordhist_jcp,
           lv_valid     TYPE abap_bool.
 
   PROTECTED SECTION.
@@ -36,7 +37,7 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
     ENDTRY.
 *Create,Read,Update, Delete
 * - - - - - - - - - - - - - - -  - - - - -  - - - - - - -  - - - - - - - - - - - - - - - - - - - - - - - - - - -
-* Validación para crear Ordenes de Trabajo
+* 4.1 Validación para crear Ordenes de Trabajo
 * - - - - - - - - - - - - - - -  - - - - -  - - - - - - -  - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 **Datos para crear la orden
@@ -52,6 +53,12 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
                                   description   = 'Reparación de HW'
 
                                ).
+
+   ls_histOrd = value #( history_id     = '100000000000'
+                         work_order_id   = '0000000001'
+                         modification_date =  lv_date
+                         change_description  =  'Cambio lector huella'
+  ).
 
 **Valida que tenga campos existan.
 
@@ -74,6 +81,7 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
 *Crear Ordenes de Trabajo
 * - - - - - - - - - - - - - - -  - - - - -  - - - - - - -  - - - - - - - - - - - - - - - - - - - - - - - - - - -
 *Valida Autorizacion para crear Ordenes
+*- - - - - - - - - - -  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     AUTHORITY-CHECK OBJECT 'ZAOWO_ID'
                     ID 'ZAFWO_ID' FIELD ls_workorder-work_order_id
                     ID 'ACTVT'   FIELD '01'.
@@ -87,8 +95,7 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
       out->write( | Tienes permisos para crear la orden de trabajo  { ls_workorder-work_order_id }  | ).
     ENDIF.
 
-*Realizar Bloqueo de tabla para crear orden de trabajo
-
+*Realiza Bloqueo de tabla para crear orden de trabajo
     out->write( |Userio inicia proceso de Bloqueo | ).
     TRY.
         DATA(lo_locked_object) = cl_abap_lock_object_factory=>get_instance(
@@ -108,12 +115,14 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
     TRY.
         lo_locked_object->enqueue( it_parameter = lt_parameter ).
       CATCH cx_abap_foreign_lock.
-        out->write( |Objeto de bloqueado por: { sy-uname } | ).
+        out->write( |Falla en Objeto de bloqueo | ).
         RETURN.
     ENDTRY.
 
 *Creación de Orden de trabajo
-    out->write( |El objeto de bloqueo esta activo| ).
+*- - - - - - - - - - -  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     out->write( |El objeto de bloqueo esta activo| ).
+     out->write( | Objeto de bloqueado por: { sy-uname } | ).
 
     DATA(lv_success) = lo_crud->create_work_order( ls_workorder ).
     IF lv_success EQ abap_true.
@@ -122,16 +131,27 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
       out->write( | La orden  { ls_workorder-work_order_id } no fue creada | ).
     ENDIF.
 
-    WAIT UP TO 5 SECONDS.
+    WAIT UP TO 3 SECONDS.
 
     TRY.
         lo_locked_object->dequeue( it_parameter = lt_parameter ).
       CATCH cx_abap_lock_failure.
         out->write( |El objeto de negocio No fue actualizado en la Base de datos| ).
     ENDTRY.
+    out->write( |Termina boqueo | ).
 
+* - - - - - - - - - - - - - - -  - - - - -  - - - - - - -  - - - - - - - - - - - - - - - - - - - - - - - - - - -
+*  4.2. Validación de Actualización de Órdenes de Trabajo
+* - - - - - - - - - - - - - - -  - - - - -  - - - - - - -  - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
+*Verificar que la orden de trabajo existe en la base de datos antes de realizar cualquier modificación.
 
+*o Comprobar que solo se pueden actualizar las órdenes cuyo estado (STATUS) esté en un estado editable (por ejemplo, "PE"
+*para pendiente).
+
+ lv_valid  = lo_valida->validate_status_and_priority( EXPORTING iv_status  = ls_workorder-STATUS
+                                                                iv_priority  =  ls_workorder-priority
+                                                      ).
 
 
   ENDMETHOD.
