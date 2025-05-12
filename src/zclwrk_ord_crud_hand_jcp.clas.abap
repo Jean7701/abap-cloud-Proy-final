@@ -8,10 +8,10 @@ CLASS zclwrk_ord_crud_hand_jcp DEFINITION
     METHODS: create_work_order IMPORTING is_workorder      TYPE ztwork_order_jcp
                                RETURNING VALUE(rv_success) TYPE abap_bool,
 
-      modificar_work_order IMPORTING is_workorder      TYPE ztwork_order_jcp
+              modificar_work_order IMPORTING is_workorder      TYPE ztwork_order_jcp
                            RETURNING VALUE(rv_success) TYPE abap_bool,
 
-      crear_Hist_work_order IMPORTING is_wrkordhist     TYPE ztwrkordhist_jcp
+              crear_Hist_work_order IMPORTING is_wrkordhist     TYPE ztwrkordhist_jcp
                             RETURNING VALUE(rv_success) TYPE abap_bool.
 
   PROTECTED SECTION.
@@ -41,7 +41,8 @@ CLASS zclwrk_ord_crud_hand_jcp IMPLEMENTATION.
   METHOD crear_hist_work_order.
     DATA: lv_text TYPE string.
     TRY.
-        INSERT ztwrkordhist_jcp FROM @is_wrkordhist .
+*        INSERT ztwrkordhist_jcp FROM @is_wrkordhist .
+      MODIFY ztwrkordhist_jcp FROM @is_wrkordhist .
       CATCH cx_sy_open_sql_db INTO DATA(lx_sql_db).
         lv_text =  lx_sql_db->get_text( ).
     ENDTRY.
@@ -59,11 +60,10 @@ CLASS zclwrk_ord_crud_hand_jcp IMPLEMENTATION.
   METHOD modificar_work_order.
 
     UPDATE ztwork_order_jcp
-     SET priority = 'A'
+     SET priority         = @is_workorder-PRIORITY
      WHERE work_order_id  = @is_workorder-work_order_id
       AND  customer_id    = @is_workorder-customer_id
       AND  technician_id  = @is_workorder-technician_id.
-
     IF sy-subrc EQ 0.
       rv_success = abap_true.
     ELSE.

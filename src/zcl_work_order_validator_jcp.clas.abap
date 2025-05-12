@@ -4,8 +4,6 @@ CLASS zcl_work_order_validator_jcp DEFINITION
   CREATE PUBLIC .
 
   PUBLIC SECTION.
-*    INTERFACES if_oo_adt_classrun.
-
     METHODS:
       validate_create_order  IMPORTING iv_customer_id   TYPE zecustomer_id
                                        iv_technician_id TYPE zetechn_id
@@ -13,9 +11,11 @@ CLASS zcl_work_order_validator_jcp DEFINITION
                                        iv_priority      TYPE zepriority_jcp
                              RETURNING VALUE(rv_valid)  TYPE abap_bool,
 
-      validate_update_order IMPORTING iv_work_order_id TYPE string
-                                      iv_status        TYPE zestatus_jcp
-                            RETURNING VALUE(rv_valid)  TYPE abap_bool,
+      validate_update_order IMPORTING is_work_order   TYPE ztwork_order_jcp
+                            RETURNING VALUE(rv_valid) TYPE abap_bool,
+
+      validate_exist_order_hist IMPORTING is_histOrd        TYPE ztwrkordhist_jcp
+                                RETURNING VALUE(rv_validoh) TYPE abap_bool,
 
       validate_delete_order IMPORTING iv_work_order_id TYPE string
                                       iv_status        TYPE zestatus_jcp
@@ -27,18 +27,22 @@ CLASS zcl_work_order_validator_jcp DEFINITION
 
   PROTECTED SECTION.
   PRIVATE SECTION.
-    DATA: c_valid_status   TYPE RANGE OF ztstatus_jcp-status_code.
-    DATA: c_valid_priority TYPE RANGE OF ztpriority_jcp-priority_code.
+    DATA: r_valid_status      TYPE RANGE OF ztstatus_jcp-status_code.
+    DATA: r_valid_priority    TYPE RANGE OF ztpriority_jcp-priority_code.
+    DATA: r_valid_status_nu   TYPE RANGE OF ztstatus_jcp-status_code.
+    DATA: r_valid_priority_nu TYPE RANGE OF ztpriority_jcp-priority_code.
 
     METHODS check_customer_exists   IMPORTING iv_customer_id  TYPE zecustomer_id  "string
                                     RETURNING VALUE(rv_valid) TYPE abap_bool.
 
+    METHODS check_order_exists      IMPORTING iv_work_order_id TYPE zewrkord_id
+                                    RETURNING VALUE(r_result)  TYPE abap_bool.
+
     METHODS check_technician_exists IMPORTING iv_technician_id TYPE zetechn_id "string
                                     RETURNING VALUE(r_result)  TYPE abap_bool.
-    METHODS check_order_exists      IMPORTING iv_work_order_id TYPE string
-                                    RETURNING VALUE(r_result)  TYPE abap_bool.
-    METHODS check_order_history     IMPORTING iv_work_order_id TYPE string
-                                    RETURNING VALUE(r_result)  TYPE abap_bool.
+
+    METHODS check_order_history     IMPORTING is_histOrd      TYPE ztwrkordhist_jcp
+                                    RETURNING VALUE(r_result) TYPE abap_bool.
 ENDCLASS.
 
 CLASS zcl_work_order_validator_jcp IMPLEMENTATION.
@@ -93,19 +97,20 @@ CLASS zcl_work_order_validator_jcp IMPLEMENTATION.
   """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
   METHOD validate_update_order.
     " Check if the work order exists
-    DATA(lv_order_exists) = check_order_exists( iv_work_order_id ).
+    DATA(lv_order_exists) = check_order_exists( is_work_order-work_order_id ).
     IF lv_order_exists IS INITIAL.
       rv_valid = abap_false.
-      RETURN.
     ENDIF.
 
     " Check if the order status is editable (e.g., Pending)
-    IF iv_status NOT IN c_valid_status.
+    IF is_work_order-status EQ 'PE'.
+      rv_valid = abap_true.
+    ELSE.
       rv_valid = abap_false.
-      RETURN.
     ENDIF.
 
-    rv_valid = abap_true.
+    RETURN.
+
   ENDMETHOD.
 
 
@@ -116,32 +121,46 @@ CLASS zcl_work_order_validator_jcp IMPLEMENTATION.
      FROM ztwork_order_jcp
      WHERE work_order_id EQ @iv_work_order_id
      INTO @lv_work_order_id .
+    IF sy-subrc EQ 0.
+      r_result = abap_true.
+    ELSE.
+      r_result = abap_false.
+    ENDIF.
 
+  ENDMETHOD.
+  """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+  METHOD validate_exist_order_hist.
+    DATA(lv_order_ohexist) = check_order_history( is_histOrd ).
+    IF lv_order_ohexist = abap_true.
+      rv_validoh = abap_true.
+    ELSE.
+      rv_validoh = abap_false.
+    ENDIF.
   ENDMETHOD.
 
   """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
   METHOD validate_delete_order.
     " Check if the order exists
-    DATA(lv_order_exists) = check_order_exists( iv_work_order_id ).
-    IF lv_order_exists IS INITIAL.
-      rv_valid = abap_false.
-      RETURN.
-    ENDIF.
-
-    " Check if the order status is "PE" (Pending)
-    IF iv_status NE 'PE'.
-      rv_valid = abap_false.
-      RETURN.
-    ENDIF.
-
-    " Check if the order has a history (i.e., if it has been modified before)
-    DATA(lv_has_history) = check_order_history( iv_work_order_id ).
-    IF lv_has_history IS NOT INITIAL.
-      .       rv_valid = abap_false.
-      RETURN.
-    ENDIF.
-
-    rv_valid = abap_true.
+*    DATA(lv_order_exists) = check_order_exists( iv_work_order_id ).
+*    IF lv_order_exists IS INITIAL.
+*      rv_valid = abap_false.
+*      RETURN.
+*    ENDIF.
+*
+*    " Check if the order status is "PE" (Pending)
+*    IF iv_status NE 'PE'.
+*      rv_valid = abap_false.
+*      RETURN.
+*    ENDIF.
+*
+*    " Check if the order has a history (i.e., if it has been modified before)
+*    DATA(lv_has_history) = check_order_history( iv_work_order_id ).
+*    IF lv_has_history IS NOT INITIAL.
+*      .       rv_valid = abap_false.
+*      RETURN.
+*    ENDIF.
+*
+*    rv_valid = abap_true.
 
   ENDMETHOD.
 
@@ -150,8 +169,14 @@ CLASS zcl_work_order_validator_jcp IMPLEMENTATION.
 
     SELECT SINGLE work_order_id
      FROM ztwrkordhist_jcp
-     WHERE work_order_id EQ @iv_work_order_id
+     WHERE history_id    eq @is_histOrd-history_id
+       and work_order_id EQ @is_histOrd-work_order_id
      INTO @lv_work_order_id .
+     if sy-subrc eq 0.
+     r_result = abap_true.
+     else.
+     r_result = abap_false.
+     endif.
 
   ENDMETHOD.
 
@@ -166,7 +191,7 @@ CLASS zcl_work_order_validator_jcp IMPLEMENTATION.
     INTO TABLE @lt_priority.
 
     LOOP AT lt_priority ASSIGNING FIELD-SYMBOL(<fs_priority>).
-      c_valid_priority = VALUE #(
+      r_valid_priority = VALUE #(
        ( sign = 'I' option = 'EQ' low = <fs_priority>-priority_code )
      ) .
     ENDLOOP.
@@ -176,29 +201,28 @@ CLASS zcl_work_order_validator_jcp IMPLEMENTATION.
      INTO TABLE @lt_status.
 
     LOOP AT lt_status ASSIGNING FIELD-SYMBOL(<fs_status>).
-      c_valid_status = VALUE #(
+      r_valid_status = VALUE #(
            ( sign = 'I' option = 'EQ' low = <fs_status>-status_code )
          ) .
     ENDLOOP.
 
     " Validate the status value
-    IF iv_status NOT IN c_valid_status.
+    IF iv_status NOT IN r_valid_status.
       rv_valid = abap_false.
-      RETURN.
     ELSE.
       rv_valid = abap_true.
-      RETURN.
     ENDIF.
 
     " Validate the priority value
-    IF iv_priority NOT IN c_valid_priority.
+    IF iv_priority NOT IN r_valid_priority.
       rv_valid = abap_false.
-      RETURN.
     ELSE.
       rv_valid = abap_true.
-      RETURN.
     ENDIF.
 
+    RETURN.
   ENDMETHOD.
+
+
 
 ENDCLASS.

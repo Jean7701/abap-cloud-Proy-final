@@ -15,11 +15,11 @@ CLASS zcl_work_order_crud_test_jcp DEFINITION
     METHODS: enqueue_ot IMPORTING iv_campo        TYPE string
                                    iv_name         TYPE if_abap_lock_object=>tv_name
                                    iv_value        TYPE zewrkord_id
-                         exporting lt_parameter    type if_abap_lock_object=>tt_parameter
+                         EXPORTING lt_parameter    TYPE if_abap_lock_object=>tt_parameter
                          RETURNING VALUE(rv_valid) TYPE abap_bool RAISING cx_abap_lock_failure,
 
             dequeue_OT IMPORTING iv_name         TYPE if_abap_lock_object=>tv_name
-                                 lt_parameter    type if_abap_lock_object=>tt_parameter
+                                 lt_parameter    TYPE if_abap_lock_object=>tt_parameter
                                RETURNING VALUE(rv_valid) TYPE abap_bool.
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -55,9 +55,10 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
     DATA(lo_crud)   = NEW zclwrk_ord_crud_hand_jcp( ).
     DATA(lo_valida) = NEW zcl_work_order_validator_jcp( ).
 
-    ls_workorder = VALUE #(    work_order_id    = '0000000001'
-                                  customer_id   = '00000001' "'70000001'
-                                  technician_id = 'T0000001' "'STDESLIB'
+    ls_workorder = VALUE #(       client = sy-mandt
+                                  work_order_id    = '0000000002'
+                                  customer_id   = '00000002' "'70000001'
+                                  technician_id = 'T0000002' "'STDESLIB'
                                   creation_date = lv_date "utclong_current( )    "CL_ABAP_CONTEXT_INFO=>get_system_date( )
                                   status        = 'P'
                                   priority      = 'B'
@@ -69,18 +70,21 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
                           work_order_id   = '0000000001'
                           modification_date =  lv_date
                           change_description  =  'Cambio lector huella'
+
    ).
 
+
+
 *Swithch para cambiar la opción
-*   opc =
-*   'CR_OT'.
+    opc =
+    'CR_OT'.
 *   'MOD_OT'.
 *   'DEL_OT'.
 
 
     CASE opc.
       WHEN 'CR_OT'.
-      clear lt_parameter.
+        CLEAR lt_parameter.
 
 **Valida que tenga campos existan.
         lv_valid  = lo_valida->validate_create_order( EXPORTING iv_customer_id   = ls_workorder-customer_id
@@ -109,51 +113,103 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
         IF lv_aut = abap_true.
           out->write( | Tienes permisos para crear la orden de trabajo { ls_workorder-work_order_id } | ).
         ELSE.
-          out->write( | Tienes permisos para crear la orden de trabajo  { ls_workorder-work_order_id }  | ).
+          out->write( | No Tienes permisos para crear la orden de trabajo  { ls_workorder-work_order_id }  | ).
         ENDIF.
 
 *Realiza Bloqueo de tabla para crear orden de trabajo
 
-        lv_valid = me->enqueue_ot( EXPORTING iv_campo = 'WORK_ORDER_ID'
-                                              iv_name  = 'EZ_WRKORD_JCP'
-                                              iv_value = ls_workorder-work_order_id
-                                              ).
+        TRY.
+            lv_valid = me->enqueue_ot( EXPORTING iv_campo = 'WORK_ORDER_ID'
+                                                  iv_name  = 'EZ_WRKORD_JCP'
+                                                  iv_value = ls_workorder-work_order_id
+                                                  ).
+          CATCH cx_abap_lock_failure.
+            "handle exception
+        ENDTRY.
         IF  lv_valid EQ abap_true.
           out->write( |El objeto de bloqueo esta activo| ).
-          else.
-           out->write( |Falla en Objeto de bloqueo | ).
-           exit.
+        ELSE.
+          out->write( |Falla en Objeto de bloqueo | ).
+          EXIT.
         ENDIF.
 *Crea OT
- DATA(lv_success) = lo_crud->create_work_order( ls_workorder ).
-    IF lv_success EQ abap_true.
-      out->write( | La orden  { ls_workorder-work_order_id } fue creada correctamente | ).
-    ELSE.
-      out->write( | La orden  { ls_workorder-work_order_id } no fue creada | ).
-    ENDIF.
+        DATA(lv_success) = lo_crud->create_work_order( ls_workorder ).
+        IF lv_success EQ abap_true.
+          out->write( | La orden  { ls_workorder-work_order_id } fue creada correctamente | ).
+        ELSE.
+          out->write( | La orden  { ls_workorder-work_order_id } no fue creada | ).
+        ENDIF.
 
-    WAIT UP TO 3 SECONDS.
-
+        COMMIT WORK AND WAIT.
 *  Desbloqueo de tabla para crear orden de trabajo
-  lv_valid = me->dequeue_ot( EXPORTING  iv_name  = 'EZ_WRKORD_JCP'
-                                        lt_parameter = lt_parameter
-                                              ).
+        lv_valid = me->dequeue_ot( EXPORTING  iv_name  = 'EZ_WRKORD_JCP'
+                                              lt_parameter = lt_parameter
+                                                    ).
         IF  lv_valid EQ abap_true.
-          out->write( |El objeto de bloqueo esta activo| ).
-          else.
-           out->write( |Falla en Objeto de bloqueo | ).
-           exit.
+          out->write( |Objeto de bloqueo liberado| ).
+        ELSE.
+          out->write( |Falla en Objeto de bloqueo | ).
+          EXIT.
         ENDIF.
       WHEN 'MOD_OT'.
 * Validación de Actualización de Órdenes de Trabajo
-** - - - - - - - - - - - - - - -  - - - - -  - - - - - - -  - - - - - - - - - - - - - - - - - - - - - - - - - - -
-*
-**Verificar que la orden de trabajo existe en la base de datos antes de realizar cualquier modificación.
-**o Comprobar que solo se pueden actualizar las órdenes cuyo estado (STATUS) esté en un estado editable (por ejemplo, "PE"
-**para pendiente).
-*    lv_valid  = lo_valida->validate_status_and_priority( EXPORTING iv_status  = ls_workorder-status
-*                                                                   iv_priority  =  ls_workorder-priority
-**                                                         ).
+
+*1. Verificar que la orden de trabajo existe en la base de datos antes de realizar cualquier modificación.
+*   ademas, revisa que en la orden de trabajo el status pueda modificarse, es decir status = PE
+        lv_valid = lo_valida->validate_update_order( EXPORTING is_work_order = ls_workorder
+                                               ).
+        IF  lv_valid EQ abap_true.
+          out->write( |La orden de trabajo { ls_workorder-work_order_id } tiene condiciones para ser modificada | ).
+        ENDIF.
+
+        DATA(lv_validh) = lo_valida->validate_exist_order_hist( EXPORTING is_histOrd = ls_histOrd
+                                               ).
+        IF  lv_validh EQ abap_true.
+          out->write( |La orden de trabajo { ls_workorder-work_order_id } tiene condiciones para ser modificada | ).
+          else.
+          out->write( |La orden de trabajo { ls_workorder-work_order_id } tiene condiciones para crear registro historial | ).
+        ENDIF.
+
+*Valida Autorizacion para crear Ordenes
+*- - - - - - - - - - -  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+        AUTHORITY-CHECK OBJECT 'ZAOWO_ID'
+                        ID 'ZAFWO_ID' FIELD ls_workorder-work_order_id
+                        ID 'ACTVT'   FIELD '02'.
+        DATA(lv_autm) = COND #( WHEN sy-subrc = 0
+                               THEN abap_true
+                               ELSE abap_false ).
+
+        IF lv_autm = abap_true.
+          out->write( | Tienes permisos para Modificar la orden de trabajo { ls_workorder-work_order_id } | ).
+        ELSE.
+          out->write( | No Tienes permisos para crear la orden de trabajo  { ls_workorder-work_order_id }  | ).
+        ENDIF.
+
+*Valida Autorizacion para crear Ordenes history_id
+*- - - - - - - - - - -  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+        AUTHORITY-CHECK OBJECT 'ZAOHIST_ID'
+                        ID 'ZAFHIST_ID' FIELD ls_histOrd-history_id
+                        ID 'ACTVT'   FIELD '02'.
+        DATA(lv_auth) = COND #( WHEN sy-subrc = 0
+                               THEN abap_true
+                               ELSE abap_false ).
+
+        IF lv_auth = abap_true.
+          out->write( | Tienes permisos para crear o actualizar la orden de trabajo { ls_histOrd-history_id } | ).
+        ELSE.
+          out->write( | No Tienes permisos para crear o actualizar la orden de trabajo  { ls_histOrd-history_id }  | ).
+        ENDIF.
+
+*Modificacion OT
+        DATA(lv_rmo) = lo_crud->modificar_work_order( ls_workorder ).
+        IF lv_rmo EQ abap_true.
+          DATA(lv_crh) = lo_crud->crear_hist_work_order( ls_histOrd ).
+        ENDIF.
+
+
+*2. Comprobar que solo se pueden actualizar las órdenes cuyo estado (STATUS) esté en un estado editable (por ejemplo, "PE"
+*para pendiente).
+
       WHEN 'DEL_OT'.
     ENDCASE.
   ENDMETHOD.
@@ -188,17 +244,17 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
 
     IF sy-subrc EQ 0.
       rv_valid = abap_true.
-       else.
-       rv_valid = abap_false.
+    ELSE.
+      rv_valid = abap_false.
     ENDIF.
 
   ENDMETHOD.
 
   METHOD dequeue_ot.
 
-      TRY.
-    DATA(lo_locked_object) = cl_abap_lock_object_factory=>get_instance(
-        EXPORTING iv_name = iv_name ). "'EZ_WRKORD_JCP'
+    TRY.
+        DATA(lo_locked_object) = cl_abap_lock_object_factory=>get_instance(
+            EXPORTING iv_name = iv_name ). "'EZ_WRKORD_JCP'
 *Bloqueo de objetos instancia no creada
       CATCH cx_abap_lock_failure.
         rv_valid = abap_false.
@@ -206,15 +262,15 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
     ENDTRY.
 
 
-  TRY.
-  lo_locked_object->dequeue( it_parameter = lt_parameter ).
+    TRY.
+        lo_locked_object->dequeue( it_parameter = lt_parameter ).
       CATCH cx_abap_lock_failure.
 *        out->write( |El objeto de negocio No fue actualizado en la Base de datos| ).
     ENDTRY.
-     IF sy-subrc EQ 0.
+    IF sy-subrc EQ 0.
       rv_valid = abap_true.
-      else.
-       rv_valid = abap_false.
+    ELSE.
+      rv_valid = abap_false.
     ENDIF.
 
   ENDMETHOD.

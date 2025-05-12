@@ -91,7 +91,11 @@ CLASS zcl_llena_catalogos IMPLEMENTATION.
                             )
                             ).
 
-                             Modify zttechnician_jcp from table @lt_tech.
+*                             Modify zttechnician_jcp from table @lt_tech.
+
+
+delete from ztwork_order_jcp.
+
 
   endmethod.
 
