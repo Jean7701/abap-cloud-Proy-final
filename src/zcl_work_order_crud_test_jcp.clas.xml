@@ -11,6 +11,152 @@
     <FIXPT>X</FIXPT>
     <UNICODE>X</UNICODE>
    </VSEOCLASS>
+   <TPOOL>
+    <item>
+     <ID>I</ID>
+     <KEY>B01</KEY>
+     <ENTRY>Bloqueo activo</ENTRY>
+     <LENGTH>20</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>B02</KEY>
+     <ENTRY>Fallo en Objeto de bloqueo</ENTRY>
+     <LENGTH>40</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>B10</KEY>
+     <ENTRY>Desbloqueo exitoso</ENTRY>
+     <LENGTH>35</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>B11</KEY>
+     <ENTRY>Error al Desbloquear objeto</ENTRY>
+     <LENGTH>35</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>C03</KEY>
+     <ENTRY>Datos validos</ENTRY>
+     <LENGTH>40</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>C04</KEY>
+     <ENTRY>Se encontró almenos un dato no valido</ENTRY>
+     <LENGTH>40</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>C05</KEY>
+     <ENTRY>No tienes permisos para crear orden de trabajo</ENTRY>
+     <LENGTH>50</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>C07</KEY>
+     <ENTRY>Auth-OK</ENTRY>
+     <LENGTH>10</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>C08</KEY>
+     <ENTRY>Orden de trabajo creada</ENTRY>
+     <LENGTH>35</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>C09</KEY>
+     <ENTRY>No se creo la orden de trabajo</ENTRY>
+     <LENGTH>35</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>D01</KEY>
+     <ENTRY>Auth.Borrado  OK</ENTRY>
+     <LENGTH>50</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>D02</KEY>
+     <ENTRY>NO Auth.Borrado  OK</ENTRY>
+     <LENGTH>50</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>D03</KEY>
+     <ENTRY>Borrado exitoso</ENTRY>
+     <LENGTH>30</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>D04</KEY>
+     <ENTRY>Borrado No exitoso</ENTRY>
+     <LENGTH>30</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>U01</KEY>
+     <ENTRY>Orden de trabajo valida</ENTRY>
+     <LENGTH>50</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>U02</KEY>
+     <ENTRY>Orden de trabajo ya se encuentra cerrada</ENTRY>
+     <LENGTH>50</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>U03</KEY>
+     <ENTRY>Orden de trabajo no existe</ENTRY>
+     <LENGTH>50</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>U04</KEY>
+     <ENTRY>La orden de trabajo tiene historia</ENTRY>
+     <LENGTH>50</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>U05</KEY>
+     <ENTRY>Se creará una historia para esta Orden de trabajo</ENTRY>
+     <LENGTH>50</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>U06</KEY>
+     <ENTRY>Aut Mod orden OK</ENTRY>
+     <LENGTH>50</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>U07</KEY>
+     <ENTRY>Aut Mod.hist OK</ENTRY>
+     <LENGTH>50</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>U08</KEY>
+     <ENTRY>No tiene Aut.</ENTRY>
+     <LENGTH>50</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>U09</KEY>
+     <ENTRY>La orden de trabajo se actualizo correctamente</ENTRY>
+     <LENGTH>50</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>U10</KEY>
+     <ENTRY>La orden de trabajo no se actualizo</ENTRY>
+     <LENGTH>50</LENGTH>
+    </item>
+   </TPOOL>
   </asx:values>
  </asx:abap>
 </abapGit>

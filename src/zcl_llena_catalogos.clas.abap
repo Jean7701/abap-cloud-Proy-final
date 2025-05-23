@@ -9,7 +9,11 @@ CLASS zcl_llena_catalogos DEFINITION
   PRIVATE SECTION.
 ENDCLASS.
 
-CLASS zcl_llena_catalogos IMPLEMENTATION.
+
+
+CLASS ZCL_LLENA_CATALOGOS IMPLEMENTATION.
+
+
   METHOD if_oo_adt_classrun~main.
 
     DATA: lt_priority TYPE STANDARD TABLE OF zpriority_jcp.
@@ -98,5 +102,4 @@ delete from ztwork_order_jcp.
 
 
   endmethod.
-
 ENDCLASS.
