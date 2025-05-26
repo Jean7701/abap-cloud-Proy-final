@@ -35,8 +35,8 @@ CLASS zcl_work_order_validator_jcp DEFINITION
     DATA: r_valid_status_nu   TYPE RANGE OF ztstatus_jcp-status_code.
     DATA: r_valid_priority_nu TYPE RANGE OF ztpriority_jcp-priority_code.
 
-    METHODS check_customer_exists   IMPORTING iv_customer_id   TYPE zecustomer_id  "string
-                                    RETURNING VALUE(rv_valid)  TYPE abap_bool.
+    METHODS check_customer_exists   IMPORTING iv_customer_id  TYPE zecustomer_id  "string
+                                    RETURNING VALUE(rv_valid) TYPE abap_bool.
 
     METHODS check_order_exists      IMPORTING iv_work_order_id TYPE zewrkord_id
                                     RETURNING VALUE(r_result)  TYPE abap_bool.
@@ -44,8 +44,8 @@ CLASS zcl_work_order_validator_jcp DEFINITION
     METHODS check_technician_exists IMPORTING iv_technician_id TYPE zetechn_id
                                     RETURNING VALUE(r_result)  TYPE abap_bool.
 
-    METHODS check_order_history     IMPORTING is_histOrd       TYPE ztwrkordhist_jcp
-                                    RETURNING VALUE(r_result)  TYPE abap_bool.
+    METHODS check_order_history     IMPORTING is_histOrd      TYPE ztwrkordhist_jcp
+                                    RETURNING VALUE(r_result) TYPE abap_bool.
 ENDCLASS.
 
 
@@ -146,25 +146,25 @@ CLASS zcl_work_order_validator_jcp IMPLEMENTATION.
 
     DATA: lt_priority TYPE STANDARD TABLE OF zpriority_jcp.
     DATA: lt_status   TYPE STANDARD TABLE OF ztstatus_jcp.
+    DATA: lr_pri  LIKE LINE OF  r_valid_priority,
+          lr_stat LIKE LINE OF  r_valid_status.
 
-    SELECT priority_code, priority_description
+    SELECT client, priority_code, priority_description
     FROM zpriority_jcp
     INTO TABLE @lt_priority.
 
-    LOOP AT lt_priority ASSIGNING FIELD-SYMBOL(<fs_priority>).
-      r_valid_priority = VALUE #(
-       ( sign = 'I' option = 'EQ' low = <fs_priority>-priority_code )
-     ) .
+    LOOP AT lt_priority INTO DATA(lw_pri).
+      lr_pri-sign = 'I'. lr_pri-option = 'EQ'.  lr_pri-low = lw_pri-priority_code .
+      APPEND lr_pri TO   r_valid_priority.
     ENDLOOP.
 
-    SELECT status_code, status_description
+    SELECT client, status_code, status_description
      FROM ztstatus_jcp
      INTO TABLE @lt_status.
 
-    LOOP AT lt_status ASSIGNING FIELD-SYMBOL(<fs_status>).
-      r_valid_status = VALUE #(
-           ( sign = 'I' option = 'EQ' low = <fs_status>-status_code )
-         ) .
+    LOOP AT lt_status INTO DATA(lw_sts).
+      lr_stat-sign = 'I'.  lr_stat-option = 'EQ'.  lr_stat-low = lw_sts-status_code .
+      APPEND lr_stat TO  r_valid_status.
     ENDLOOP.
 
     " Validate the status value
@@ -199,7 +199,7 @@ CLASS zcl_work_order_validator_jcp IMPLEMENTATION.
         INTO @ev_status .
 
     " Check if the order status is editable (e.g., Pending)
-    IF is_work_order-status EQ 'PE'.
+    IF ev_status  EQ 'PE'.
       rv_valid = abap_true.
     ELSE.
       rv_valid = abap_false.
@@ -218,12 +218,12 @@ CLASS zcl_work_order_validator_jcp IMPLEMENTATION.
          AND customer_id   = @is_work_order-customer_id
 *        and technician_id = @is_work_order-technician_id
          INTO ( @ev_status, @ev_priority ).
-    IF sy-subrc eq 0.
+    IF sy-subrc EQ 0.
       rv_valid = abap_true.
     ELSE.
       rv_valid = abap_false.
     ENDIF.
-      RETURN.
+    RETURN.
   ENDMETHOD.
 
 ENDCLASS.

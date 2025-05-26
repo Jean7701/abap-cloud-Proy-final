@@ -11,8 +11,8 @@ CLASS zcl_work_order_crud_test_jcp DEFINITION
     DATA: ls_workorder TYPE ztwork_order_jcp,
           ls_histOrd   TYPE ztwrkordhist_jcp,
           lv_valid     TYPE abap_bool.
-    DATA: lv_status    TYPE zestatus_jcp,
-          lv_priority type zepriority_jcp.
+    DATA: lv_status   TYPE zestatus_jcp,
+          lv_priority TYPE zepriority_jcp.
 
     METHODS: enqueue_ot IMPORTING iv_campo        TYPE string
                                    iv_name         TYPE if_abap_lock_object=>tv_name
@@ -123,56 +123,37 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
     DATA(lo_valida) = NEW zcl_work_order_validator_jcp( ).
 
     ls_workorder = VALUE #(       client = sy-mandt
-                                  work_order_id    = '0000000002'
-                                  customer_id   = '00000002' "'70000001'
-                                  technician_id = 'T0000002' "'STDESLIB'
-                                  creation_date = lv_date "utclong_current( )    "CL_ABAP_CONTEXT_INFO=>get_system_date( )
-                                  status        = 'P'
-                                  priority      = 'B'
-                                  description   = 'Reparación de HW'
-
+                                  work_order_id    = '0000000005'
+                                  customer_id      = '00000001' "'70000001'
+                                  technician_id    = 'T0000003' "'STDESLIB'
+                                  creation_date    = lv_date "utclong_current( )    "CL_ABAP_CONTEXT_INFO=>get_system_date( )
+                                  status           = 'PE'
+                                  priority         = 'B'
+                                  description      = 'Recup.datos móviles' "'Soporte de dspositivos moviles'
                                ).
 
-    ls_histOrd = VALUE #( history_id     = '100000000000'
-                          work_order_id   = '0000000001'
-                          modification_date =  lv_date
-                          change_description  =  'Cambio lector huella'
-
-   ).
+*    ls_histOrd = VALUE #( history_id     = '100000000000'
+*                          work_order_id   = '0000000002'
+*                          modification_date =  lv_date
+*                          change_description  =  'Diagnóstico inicial'
+*
+*   ).
 
 *Swithch para opción operación.
     opc =
-    'CR_OT'.
+*    'CR_OT'.
 *   'MOD_OT'.
-*   'DEL_OT'.
+   'DEL_OT'.
 
 
     CASE opc.
       WHEN 'CR_OT'.
         CLEAR lt_parameter.
-
-**Valida que tenga campos existan.
-        lv_valid  = lo_valida->validate_create_order( EXPORTING iv_customer_id   = ls_workorder-customer_id
-                                                                iv_technician_id = ls_workorder-technician_id
-                                                                iv_status        = ls_workorder-status
-                                                                iv_priority      = ls_workorder-priority
-                                         ).
-
-        IF lv_valid EQ abap_true.
-          out->write( TEXT-c03 ).
-        ELSE.
-          out->write( TEXT-c04 ).
-        ENDIF.
-
-        out->write( ls_workorder-work_order_id ).
-        out->write( ls_workorder-customer_id ).
-        out->write( ls_workorder-technician_id ).
-
 *Valida Autorizacion para crear Ordenes
 *- - - - - - - - - - -  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
         AUTHORITY-CHECK OBJECT 'ZAOWO_ID'
                         ID 'ZAFWO_ID' FIELD ls_workorder-work_order_id
-                        ID 'ACTVT'   FIELD '01'.
+                        ID 'ACTVT'    FIELD '01'.
         DATA(lv_aut) = COND #( WHEN sy-subrc = 0
                                THEN abap_true
                                ELSE abap_false ).
@@ -182,10 +163,35 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
         ELSE.
           out->write( TEXT-c05 ).
           out->write( ls_workorder-work_order_id ).
+          EXIT.
+        ENDIF.
+
+* Registro a crear
+        out->write( ls_workorder-work_order_id ).
+        out->write( ls_workorder-customer_id ).
+        out->write( ls_workorder-technician_id ).
+        out->write( ls_workorder-creation_date ).
+        out->write( ls_workorder-status ).
+        out->write( ls_workorder-priority ).
+        out->write( ls_workorder-description ).
+
+**Valida que tenga campos existan.
+        CLEAR lv_valid.
+        lv_valid  = lo_valida->validate_create_order( EXPORTING iv_customer_id   = ls_workorder-customer_id
+                                                                iv_technician_id = ls_workorder-technician_id
+                                                                iv_status        = ls_workorder-status
+                                                                iv_priority      = ls_workorder-priority
+                                         ).
+
+        IF lv_valid EQ abap_true.
+          out->write( TEXT-C03 ).
+        ELSE.
+          out->write( TEXT-C04 ).
+          EXIT.
         ENDIF.
 
 *Realiza Bloqueo de tabla para crear orden de trabajo
-
+        CLEAR lv_valid.
         TRY.
             lv_valid = me->enqueue_ot( EXPORTING iv_campo = 'WORK_ORDER_ID'
                                                   iv_name  = 'EZ_WRKORD_JCP'
@@ -195,30 +201,30 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
             "handle exception
         ENDTRY.
         IF  lv_valid EQ abap_true.
-          out->write( TEXT-b01 ).
+          out->write( TEXT-B01 ).
         ELSE.
-          out->write( TEXT-b02 ).
+          out->write( TEXT-B02 ).
           EXIT.
         ENDIF.
-*Crea OT
+*Crea OT en BD
         DATA(lv_success) = lo_crud->create_work_order( ls_workorder ).
         IF lv_success EQ abap_true.
-          out->write( TEXT-c08 ).
+          out->write( TEXT-C08 ).
+             COMMIT WORK AND WAIT.
         ELSE.
-          out->write( TEXT-c09 ).
+          out->write( TEXT-C09 ).
+                ROLLBACK WORK.
         ENDIF.
         out->write( ls_workorder-work_order_id ).
-        COMMIT WORK AND WAIT.
 
 *  Desbloqueo de tabla para crear orden de trabajo
-
         lv_valid = me->dequeue_ot( EXPORTING  iv_name  = 'EZ_WRKORD_JCP'
                                               lt_parameter = lt_parameter
                                                     ).
         IF  lv_valid EQ abap_true.
-          out->write( TEXT-b10 ).
+          out->write( TEXT-B10 ).
         ELSE.
-          out->write( TEXT-b11 ).
+          out->write( TEXT-B11 ).
           EXIT.
         ENDIF.
 
@@ -234,9 +240,9 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
                                ELSE abap_false ).
 
         IF lv_autm = abap_true.
-          out->write( TEXT-u06 ).
+          out->write( TEXT-U06 ).
         ELSE.
-          out->write( TEXT-u08 ).
+          out->write( TEXT-U08 ).
           EXIT.
         ENDIF.
 
@@ -250,9 +256,9 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
                                ELSE abap_false ).
 
         IF lv_auth = abap_true.
-          out->write( TEXT-u07 ).
+          out->write( TEXT-U07 ).
         ELSE.
-          out->write( TEXT-u08 ).
+          out->write( TEXT-U08 ).
           EXIT.
         ENDIF.
 
@@ -262,29 +268,28 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
                                                      IMPORTING ev_status     = lv_status
                                                ).
         IF  lv_valid EQ abap_true AND lv_status EQ 'PE'.
-          out->write( TEXT-u01 ).
+          out->write( TEXT-U01 ).
           out->write( ls_workorder-work_order_id ).
         ELSEIF lv_valid EQ abap_true AND lv_status EQ 'CO'.
-          out->write( TEXT-u02 ).
+          out->write( TEXT-U02 ).
           EXIT.
         ELSE.
-          out->write( TEXT-u03 ).
+          out->write( TEXT-U03 ).
           EXIT.
         ENDIF.
 
         DATA(lv_validh) = lo_valida->validate_exist_hist_order( EXPORTING is_histOrd = ls_histOrd
                                                ).
         IF  lv_validh EQ abap_true.
-          out->write( TEXT-u04 ).
+          out->write( TEXT-U04 ).
           out->write( ls_workorder-work_order_id ).
         ELSE.
-          out->write( TEXT-u05 ).
+          out->write( TEXT-U05 ).
           out->write( ls_workorder-work_order_id ).
-          EXIT.
+*          EXIT.
         ENDIF.
 
 *Objeto de bloqueo orden trabajo
-
         TRY.
             lv_valid = me->enqueue_ot( EXPORTING iv_campo = 'WORK_ORDER_ID'
                                                   iv_name  = 'EZ_WRKORD_JCP'
@@ -294,9 +299,9 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
             "handle exception
         ENDTRY.
         IF  lv_valid EQ abap_true.
-          out->write( TEXT-b01 ).
+          out->write( TEXT-B01 ).
         ELSE.
-          out->write( TEXT-b02 ).
+          out->write( TEXT-B02 ).
           EXIT.
         ENDIF.
 
@@ -304,9 +309,9 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
         DATA(lv_rmo) = lo_crud->modificar_work_order( ls_workorder ).
         IF lv_rmo EQ abap_true.
           IF  lv_valid EQ abap_true.
-            out->write( TEXT-b01 ).
+            out->write( TEXT-U09 ).
           ELSE.
-            out->write( TEXT-b02 ).
+            out->write( TEXT-U10 ).
             EXIT.
           ENDIF.
 
@@ -318,10 +323,16 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
           ENDIF.
         ENDIF.
 
+        IF lv_rmo EQ abap_true OR lv_val = abap_true.
+         COMMIT WORK AND WAIT.
+         ELSE.
+         ROLLBACK WORK.
+         ENDIF.
+
         IF lv_crh EQ abap_true OR lv_cho EQ abap_true.
-          out->write( TEXT-u09 ).
+          out->write( TEXT-U09 ).
         ELSE.
-          out->write( TEXT-u10 ).
+          out->write( TEXT-U10 ).
         ENDIF.
 
 *  Desbloqueo de tabla para crear orden de trabajo
@@ -329,9 +340,9 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
                                               lt_parameter = lt_parameter
                                                     ).
         IF  lv_valid EQ abap_true.
-          out->write( TEXT-b10 ).
+          out->write( TEXT-B10 ).
         ELSE.
-          out->write( TEXT-b11 ).
+          out->write( TEXT-B11 ).
           EXIT.
         ENDIF.
 
@@ -346,56 +357,56 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
                                ELSE abap_false ).
 
         IF lv_autd = abap_true.
-          out->write( TEXT-d01 ).
+          out->write( TEXT-D01 ).
         ELSE.
-          out->write( TEXT-d02 ).
+          out->write( TEXT-D02 ).
           EXIT.
         ENDIF.
 
 *Borrar solo OT en estado pendinte
-        data(lv_vdel)  =  lo_valida->validate_delete_order( EXPORTING is_work_order = ls_workorder
+        DATA(lv_vdel)  =  lo_valida->validate_delete_order( EXPORTING is_work_order = ls_workorder
                                                                       is_histOrd    = ls_histOrd
-                                                            importing ev_status     = lv_status
+                                                            IMPORTING ev_status     = lv_status
                                                                       ev_priority   = lv_priority
                                          ).
-        IF lv_vdel EQ abap_true and lv_priority eq 'PE'.
+        IF lv_vdel EQ abap_true AND lv_STATUS EQ 'PE'.
 *          out->write( TEXT-D03 ).
 *Objeto de bloqueo orden trabajo
-        TRY.
-            lv_valid = me->enqueue_ot( EXPORTING iv_campo = 'WORK_ORDER_ID'
-                                                  iv_name  = 'EZ_WRKORD_JCP'
-                                                  iv_value = ls_workorder-work_order_id
-                                                  ).
-          CATCH cx_abap_lock_failure.
-            "handle exception
-        ENDTRY.
-        IF  lv_valid EQ abap_true.
-          out->write( TEXT-b01 ).
-        ELSE.
-          out->write( TEXT-b02 ).
-          EXIT.
-        ENDIF.
+          TRY.
+              lv_valid = me->enqueue_ot( EXPORTING iv_campo = 'WORK_ORDER_ID'
+                                                    iv_name  = 'EZ_WRKORD_JCP'
+                                                    iv_value = ls_workorder-work_order_id
+                                                    ).
+            CATCH cx_abap_lock_failure.
+              "handle exception
+          ENDTRY.
+          IF  lv_valid EQ abap_true.
+            out->write( TEXT-B01 ).
+          ELSE.
+            out->write( TEXT-B02 ).
+            EXIT.
+          ENDIF.
 
-         DATA(lv_del) = lo_crud->delete_work_order( exporting is_workorder =  ls_workorder ).
-        IF lv_autd = abap_true.
-          out->write( text-D03 ).
-        ELSE.
-          out->write( TEXT-D04 ).
-          EXIT.
-        ENDIF.
+          DATA(lv_del) = lo_crud->delete_work_order( EXPORTING is_workorder =  ls_workorder ).
+          IF lv_autd = abap_true.
+            out->write( TEXT-D03 ).
+          ELSE.
+            out->write( TEXT-D04 ).
+            EXIT.
+          ENDIF.
 
 *  Desbloqueo de tabla para crear orden de trabajo
-        lv_valid = me->dequeue_ot( EXPORTING  iv_name  = 'EZ_WRKORD_JCP'
-                                              lt_parameter = lt_parameter
-                                                    ).
-        IF  lv_valid EQ abap_true.
-          out->write( TEXT-b10 ).
+          lv_valid = me->dequeue_ot( EXPORTING  iv_name  = 'EZ_WRKORD_JCP'
+                                                lt_parameter = lt_parameter
+                                                      ).
+          IF  lv_valid EQ abap_true.
+            out->write( TEXT-B10 ).
+          ELSE.
+            out->write( TEXT-B11 ).
+            EXIT.
+          ENDIF.
         ELSE.
-          out->write( TEXT-b11 ).
-          EXIT.
-        ENDIF.
-       ELSE.
-          out->write( TEXT-d04 ).
+          out->write( TEXT-D04 ).
         ENDIF.
 
       WHEN 'REPORTE'.
