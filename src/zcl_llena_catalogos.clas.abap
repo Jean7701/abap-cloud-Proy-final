@@ -32,40 +32,48 @@ CLASS ZCL_LLENA_CATALOGOS IMPLEMENTATION.
 **  Modify zpriority_jcp from table @lt_priority.
 *  Modify ztstatus_jcp from table @lt_status.
 *
-** - - - - - - -  - - - - - - - - - -  - - - - - - - - - - - - - - - -
-*
-*    DATA: lt_cliente TYPE TABLE OF ztcustomer_jcp.
-*    lt_cliente = VALUE #(  (  client =  sy-mandt
-*                            customer_id = '00000001'
-*                            name        = 'Jannet Cruz Pérez'
-*                            address     = 'Calle Miguel Hidalgo No. 44, Tlaxcala Tlax.'
-*                            phone       = '5555066488'
-*                            )
+** - - - - - - -  - - - - - - - - - -  - - - - - - - - - - - - - - - -}
+
+*data: lt_order type standard table of ztwork_order_jcp.
+data lv_max type ztwork_order_jcp-work_order_id.
+
+select MAX( DISTINCT work_order_id )
+from ztwork_order_jcp
+into  @lv_max .
+
+
+    DATA: lt_cliente TYPE TABLE OF ztcustomer_jcp.
+    lt_cliente = VALUE #(  (  client =  sy-mandt
+                            customer_id = '00000005'
+                            name        = 'Efrain Hernandez Hernandez'
+                            address     = 'Calle Miguel Hidalgo No. 44, Tlaxcala Tlax.'
+                            phone       = '2464665789'
+                            )
 *
 *                            (  client =  sy-mandt
-*                            customer_id = '00000002'
-*                            name        = 'Yadira Jimenez Rosas'
-*                            address     = 'Calle del vecino No 33, Yauquemecan Tlax.'
-*                            phone       = '2415066477'
+*                            customer_id = '00000006'
+*                            name        = 'Immer Hernandez Solis'
+*                            address     = 'Av.Ferrocarril Mexicano No 33, Yauquemecan Tlax.'
+*                            phone       = '2418235768'
 *                            )
 *
 *                           (  client =  sy-mandt
-*                            customer_id = '00000003'
-*                            name        = 'Israel Uri Hernandez Cruz'
-*                            address     = 'Av. Juarez No. 1234, Apizaco Tlax.'
-*                            phone       = '2414156893'
+*                            customer_id = '00000007'
+*                            name        = 'Omar Xoca Garcia'
+*                            address     = 'Av.Josefa Ortiz No.14, Amaxac de Gro.Tlax.'
+*                            phone       = '2416789065'
 *                            )
 *
-*                               (  client =  sy-mandt
-*                            customer_id = '00000004'
-*                            name        = 'Cesar Daniel Hernandez Cruz '
-*                            address     = 'Av. Independencia No. 1000,Tlaxcala Tlax.'
-*                            phone       = '2464932652'
+*                            (  client =  sy-mandt
+*                            customer_id = '00000008'
+*                            name        = 'Elia de la fuente'
+*                            address     = 'Av. Independencia No.1,Sn.Bernardino Tlax.'
+*                            phone       = '2468976434'
 *                            )
-*                               ).
+                               ).
 *
-**                               Modify ztcustomer_jcp from table @lt_cliente.
-*
+*                            Modify ztcustomer_jcp from table @lt_cliente.
+**
 *
 **  - - - - - - -  - - - - - - - - - -  - - - - - - - - - - - - - - - -
 *
