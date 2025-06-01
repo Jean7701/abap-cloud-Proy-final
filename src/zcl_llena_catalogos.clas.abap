@@ -5,19 +5,132 @@ CLASS zcl_llena_catalogos DEFINITION
 
   PUBLIC SECTION.
     INTERFACES if_oo_adt_classrun.
+    TYPES: BEGIN OF ty_wo.
+             INCLUDE TYPE ztwork_order_jcp.
+    TYPES:   modification_date  TYPE d,
+             change_description TYPE c LENGTH 50,
+           END OF ty_wo.
+    DATA lt_wo   TYPE STANDARD TABLE OF  ty_wo.
+    DATA lt_wo_ST TYPE STANDARD TABLE OF  ty_wo.
+    DATA lt_cte  TYPE STANDARD TABLE OF ztcustomer_jcp.
+    DATA lt_Tech TYPE STANDARD TABLE OF zttechnician_jcp.
+    DATA lr_wo   TYPE RANGE OF ztwork_order_jcp-work_order_id.
+    DATA lr_cust TYPE RANGE OF ztcustomer_jcp-customer_id.
+    DATA lr_tech TYPE RANGE OF zttechnician_jcp-technician_id.
+
   PROTECTED SECTION.
   PRIVATE SECTION.
 ENDCLASS.
 
 
-
-CLASS ZCL_LLENA_CATALOGOS IMPLEMENTATION.
+CLASS zcl_llena_catalogos IMPLEMENTATION.
 
 
   METHOD if_oo_adt_classrun~main.
+    DATA: lv_di TYPE d,
+          lv_df TYPE d.
 
-    DATA: lt_priority TYPE STANDARD TABLE OF zpriority_jcp.
-    DATA: lt_status   TYPE STANDARD TABLE OF ztstatus_jcp .
+    DATA: database_name TYPE string,
+          campos        TYPE string,
+          cond          TYPE string,
+          table         TYPE string.
+
+* parámetros para selección de información
+* - - - - - - - - - - -  - - - - - - - - - - -  -- - - - - -
+    lv_di = '20250501'.
+    lv_df = '20250531'.
+
+*lr_wo = VALUE #( ( sign   = 'I'
+*                 option   = 'EQ'
+*                 low      = '0000000003' )
+*                ).
+
+*lr_cust = VALUE #( ( sign   = 'I'
+*                 option   = 'EQ'
+*                 low      = '00000002' )
+*                ).
+
+*lr_tech = VALUE #( ( sign   = 'I'
+*                 option   = 'EQ'
+*                 low      = 'T0000004' )
+*                ).
+* - - - - - - - - - - -  - - - - - - - - - - -  -- - - - - -
+    database_name = 'ztwork_order_jcp as a left join ztwrkordhist_jcp as b ON a~work_order_id = b~work_order_id'.
+    campos =  'a~work_order_id, a~customer_id, a~technician_id, a~creation_date, a~status, a~priority, a~description, b~modification_date, b~change_description'.
+    cond = 'a~work_order_id in @lr_wo and a~creation_date between @lv_di and @lv_df'.
+
+    SELECT FROM (database_name)
+     FIELDS (campos)
+     WHERE (cond)
+    INTO CORRESPONDING FIELDS OF TABLE @lt_wo.
+
+    SORT lt_wo BY work_order_id.
+
+    out->write(
+     EXPORTING
+     data = lt_wo
+     name = 'Orden Trabajo'
+    ).
+* -----------------Lee clientes -------------------------------
+    CLEAR: database_name, campos, cond, table.
+    database_name = 'ztcustomer_jcp'.
+    campos        = ' client, customer_id, name, address, phone'.
+    cond          = 'customer_id in @lr_cust'.
+
+    SELECT FROM (database_name)
+     FIELDS (campos)
+     WHERE (cond)
+     INTO TABLE @lt_cte.
+
+    out->write(
+     EXPORTING
+     data = lt_cte
+     name = 'Lista Clientes'
+    ).
+** ---------------Lee técnicos ---------------------------------
+    CLEAR: database_name, campos, cond, table.
+    database_name = 'zttechnician_jcp'.
+    campos =  'client, technician_id, name, speciality'.
+    cond = 'technician_id in @lr_tech'.
+
+    SELECT FROM (database_name)
+     FIELDS (campos)
+    WHERE (cond)
+    INTO TABLE @lt_tech.
+
+    out->write(
+     EXPORTING
+     data = lt_tech
+     name = 'Lista tecnicos'
+    ).
+
+*despliega las tareas de cada uno de los técnicos
+
+    LOOP AT lt_wo ASSIGNING FIELD-SYMBOL(<fs>) GROUP BY <fs>-status.
+      CLEAR lt_wo_st.
+      LOOP AT GROUP <fs> INTO DATA(lw_wo).
+        lt_wo_st = VALUE #( BASE lt_wo_st ( lw_wo ) ).
+      ENDLOOP.
+      out->write( data = lt_wo_st name = 'STATUS' ).
+    ENDLOOP.
+    UNASSIGN <fs>.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+*    DATA: lt_priority TYPE STANDARD TABLE OF zpriority_jcp.
+*    DATA: lt_status   TYPE STANDARD TABLE OF ztstatus_jcp .
 
 *    lt_priority = VALUE #(
 *             ( priority_code = 'A'  priority_description = 'High' )
@@ -35,20 +148,20 @@ CLASS ZCL_LLENA_CATALOGOS IMPLEMENTATION.
 ** - - - - - - -  - - - - - - - - - -  - - - - - - - - - - - - - - - -}
 
 *data: lt_order type standard table of ztwork_order_jcp.
-data lv_max type ztwork_order_jcp-work_order_id.
-
-select MAX( DISTINCT work_order_id )
-from ztwork_order_jcp
-into  @lv_max .
-
-
-    DATA: lt_cliente TYPE TABLE OF ztcustomer_jcp.
-    lt_cliente = VALUE #(  (  client =  sy-mandt
-                            customer_id = '00000005'
-                            name        = 'Efrain Hernandez Hernandez'
-                            address     = 'Calle Miguel Hidalgo No. 44, Tlaxcala Tlax.'
-                            phone       = '2464665789'
-                            )
+****data lv_max type ztwork_order_jcp-work_order_id.
+****
+****select MAX( DISTINCT work_order_id )
+****from ztwork_order_jcp
+****into  @lv_max .
+****
+****
+****    DATA: lt_cliente TYPE TABLE OF ztcustomer_jcp.
+****    lt_cliente = VALUE #(  (  client =  sy-mandt
+****                            customer_id = '00000005'
+****                            name        = 'Efrain Hernandez Hernandez'
+****                            address     = 'Calle Miguel Hidalgo No. 44, Tlaxcala Tlax.'
+****                            phone       = '2464665789'
+****                            )
 *
 *                            (  client =  sy-mandt
 *                            customer_id = '00000006'
@@ -70,7 +183,7 @@ into  @lv_max .
 *                            address     = 'Av. Independencia No.1,Sn.Bernardino Tlax.'
 *                            phone       = '2468976434'
 *                            )
-                               ).
+*                               ).
 *
 *                            Modify ztcustomer_jcp from table @lt_cliente.
 **
@@ -165,5 +278,5 @@ into  @lv_max .
 
 *DELETE FROM ztwrkordhist_jcp.
 
-  endmethod.
+  ENDMETHOD.
 ENDCLASS.

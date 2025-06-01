@@ -14,6 +14,25 @@ CLASS zcl_work_order_crud_test_jcp DEFINITION
     DATA: lv_status   TYPE zestatus_jcp,
           lv_priority TYPE zepriority_jcp.
 
+    TYPES: BEGIN OF TY_ORDER,
+            work_order_id  TYPE zewrkord_id,
+            customer_id    TYPE zecustomer_id ,
+            creation_date  TYPE D,
+            modification_date TYPE D,
+            status        TYPE zestatus_jcp,
+            priority      TYPE zepriority_jcp,
+   END OF TY_ORDER.
+
+       TYPES: BEGIN OF TY_ASIG,
+            technician_id  TYPE zetechn_id,
+            work_order_id  TYPE zewrkord_id,
+            customer_id    TYPE zecustomer_id ,
+            creation_date  TYPE D,
+            modification_date TYPE D,
+            status        TYPE zestatus_jcp,
+            priority      TYPE zepriority_jcp,
+   END OF TY_ASIG.
+
     METHODS: enqueue_ot IMPORTING iv_campo        TYPE string
                                    iv_name         TYPE if_abap_lock_object=>tv_name
                                    iv_value        TYPE zewrkord_id
