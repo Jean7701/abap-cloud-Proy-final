@@ -5,35 +5,57 @@ CLASS zcl_work_order_crud_test_jcp DEFINITION
 
   PUBLIC SECTION.
     INTERFACES if_oo_adt_classrun.
+
+    TYPES: BEGIN OF ty_order,
+             work_order_id     TYPE zewrkord_id,
+             customer_id       TYPE zecustomer_id,
+             creation_date     TYPE d,
+             modification_date TYPE d,
+             status            TYPE zestatus_jcp,
+             priority          TYPE zepriority_jcp,
+           END OF ty_order.
+
+    TYPES: BEGIN OF ty_asig,
+             technician_id     TYPE zetechn_id,
+             work_order_id     TYPE zewrkord_id,
+             customer_id       TYPE zecustomer_id,
+             creation_date     TYPE d,
+             modification_date TYPE d,
+             status            TYPE zestatus_jcp,
+             priority          TYPE zepriority_jcp,
+           END OF ty_asig.
+
+    TYPES: BEGIN OF ty_tareas,
+             technician_id      TYPE zetechn_id,
+             name               TYPE string,
+             work_order_id      TYPE zewrkord_id,
+             customer_id        TYPE zecustomer_id,
+             status             TYPE zestatus_jcp,
+             priority           TYPE zepriority_jcp,
+             description        TYPE c LENGTH 50,
+             modification_date  TYPE d,
+             change_description TYPE c LENGTH 50,
+           END OF ty_tareas.
+
+    DATA lt_tareas TYPE STANDARD TABLE OF ty_tareas.
     DATA: mv_timestamp TYPE utclong,
           mv_time      TYPE t.
 
     DATA: ls_workorder TYPE ztwork_order_jcp,
           ls_histOrd   TYPE ztwrkordhist_jcp,
           lv_valid     TYPE abap_bool.
+
     DATA: lv_status   TYPE zestatus_jcp,
           lv_priority TYPE zepriority_jcp.
 
-    TYPES: BEGIN OF TY_ORDER,
-            work_order_id  TYPE zewrkord_id,
-            customer_id    TYPE zecustomer_id ,
-            creation_date  TYPE D,
-            modification_date TYPE D,
-            status        TYPE zestatus_jcp,
-            priority      TYPE zepriority_jcp,
-   END OF TY_ORDER.
+    DATA: lv_di TYPE d,
+          lv_df TYPE d.
 
-       TYPES: BEGIN OF TY_ASIG,
-            technician_id  TYPE zetechn_id,
-            work_order_id  TYPE zewrkord_id,
-            customer_id    TYPE zecustomer_id ,
-            creation_date  TYPE D,
-            modification_date TYPE D,
-            status        TYPE zestatus_jcp,
-            priority      TYPE zepriority_jcp,
-   END OF TY_ASIG.
+    DATA lr_wo   TYPE RANGE OF ztwork_order_jcp-work_order_id.
+    DATA lr_cust TYPE RANGE OF ztcustomer_jcp-customer_id.
+    DATA lr_tech TYPE RANGE OF zttechnician_jcp-technician_id.
 
-    METHODS: enqueue_ot IMPORTING iv_campo        TYPE string
+    METHODS: enqueue_ot IMPORTING iv_campo         TYPE string
                                    iv_name         TYPE if_abap_lock_object=>tv_name
                                    iv_value        TYPE zewrkord_id
                          EXPORTING lt_parameter    TYPE if_abap_lock_object=>tt_parameter
@@ -41,8 +63,17 @@ CLASS zcl_work_order_crud_test_jcp DEFINITION
 
             dequeue_OT IMPORTING iv_name         TYPE if_abap_lock_object=>tv_name
                                  lt_parameter    TYPE if_abap_lock_object=>tt_parameter
-                               RETURNING VALUE(rv_valid) TYPE abap_bool.
-  PROTECTED SECTION.
+                               RETURNING VALUE(rv_valid) TYPE abap_bool,
+
+            paramCRUD EXPORTING ework_order    TYPE ztwork_order_jcp
+                                ework_orf_hist TYPE ztwrkordhist_jcp,
+
+            param_rep EXPORTING  lv_di   type d
+                                 lv_df   type d
+                                 lr_wo   type any
+                                 lr_cust type any
+                                 lr_tech type any.
+protected section.
   PRIVATE SECTION.
 ENDCLASS.
 
@@ -50,159 +81,28 @@ ENDCLASS.
 
 CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
 
-
-  METHOD dequeue_ot.
-
-    TRY.
-        DATA(lo_locked_object) = cl_abap_lock_object_factory=>get_instance(
-            EXPORTING iv_name = iv_name ). "'EZ_WRKORD_JCP'
-*Bloqueo de objetos instancia no creada
-      CATCH cx_abap_lock_failure.
-        rv_valid = abap_false.
-        RETURN.
-    ENDTRY.
-
-
-    TRY.
-        lo_locked_object->dequeue( it_parameter = lt_parameter ).
-      CATCH cx_abap_lock_failure.
-*        out->write( |El objeto de negocio No fue actualizado en la Base de datos| ).
-    ENDTRY.
-    IF sy-subrc EQ 0.
-      rv_valid = abap_true.
-    ELSE.
-      rv_valid = abap_false.
-    ENDIF.
-
-  ENDMETHOD.
-
-
-  METHOD enqueue_ot.
-
-*    DATA lt_parameter TYPE if_abap_lock_object=>tt_parameter.
-
-    TRY.
-        DATA(lo_locked_object) = cl_abap_lock_object_factory=>get_instance(
-        EXPORTING iv_name = iv_name ). "'EZ_WRKORD_JCP'
-*Bloqueo de objetos instancia no creada
-      CATCH cx_abap_lock_failure.
-        rv_valid = abap_false.
-        RETURN.
-    ENDTRY.
-
-
-    lt_parameter = VALUE #(  ( name = iv_campo  "'WORK_ORDER_ID'
-                               value = REF #( iv_value ) "ls_workorder-work_order_id )
-                             )
-                          ).
-
-    TRY.
-        lo_locked_object->enqueue( it_parameter = lt_parameter ).
-      CATCH cx_abap_foreign_lock.
-        rv_valid = abap_false.
-        RETURN.
-        RETURN.
-    ENDTRY.
-
-    IF sy-subrc EQ 0.
-      rv_valid = abap_true.
-    ELSE.
-      rv_valid = abap_false.
-    ENDIF.
-
-  ENDMETHOD.
-
-
   METHOD if_oo_adt_classrun~main.
     DATA lt_parameter TYPE if_abap_lock_object=>tt_parameter.
     DATA: opc TYPE string.
-    DATA: lv_date TYPE d,
-          lv_time TYPE t.
-
-
-*Obtiene la fecha actual con la función “UTCLONG_CURRENT()”.
-    me->mv_timestamp = utclong_current( ).
-
-*Obtiene la fecha del sistema y la pasa a dos variables 1.fecha y 2.hora
-    TRY.
-        CONVERT UTCLONG me->mv_timestamp
-        TIME ZONE cl_abap_context_info=>get_user_time_zone( )
-        INTO DATE lv_date
-        TIME lv_time.
-      CATCH cx_abap_context_info_error.
-        "handle exception.
-    ENDTRY.
 *Create,Read,Update, Delete
 * - - - - - - - - - - - - - - -  - - - - -  - - - - - - -  - - - - - - - - - - - - - - - - - - - - - - - - - - -
 * 4.1 Validación para crear Ordenes de Trabajo
 * - - - - - - - - - - - - - - -  - - - - -  - - - - - - -  - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-**Datos para crear la orden
-    DATA lv_maxwo  TYPE ztwork_order_jcp-work_order_id.
-    DATA lv_maxhwo TYPE ztwrkordhist_jcp-history_id.
-    DATA lv_esptec TYPE zttechnician_jcp-speciality.
-
-    data: lv_tec    type  zttechnician_jcp-technician_id value 'T0000003',
-          lv_cust   type ztcustomer_jcp-customer_id      value '00000004',
-          lv_status type ztstatus_jcp-status_code        value 'CO',
-          lv_priority type ztpriority_jcp-priority_code  value 'A'.
-
-
-    SELECT MAX( DISTINCT work_order_id )
-        FROM ztwork_order_jcp
-        INTO  @lv_maxwo.
-
-    SELECT MAX( DISTINCT history_id )
-        FROM ztwrkordhist_jcp
-        INTO  @lv_maxhwo.
-
-    SELECT single
-        FROM zttechnician_jcp
-        fields speciality
-        where technician_id eq @lv_tec
-        INTO  @lv_esptec.
-
-*    ls_workorder = VALUE #(       client = sy-mandt
-*                                  work_order_id    = ( lv_maxwo + 1 )
-*                                  customer_id      = lv_cust
-*                                  technician_id    = lv_tec
-*                                  creation_date    = lv_date
-*                                  status           = lv_status
-*                                  priority         = lv_priority
-*                                  description      = lv_esptec
-*                               ).
-
-  ls_workorder = VALUE #(       client = sy-mandt
-                                  work_order_id    = '0000000005' "( lv_maxwo + 1 )
-                                  customer_id      = lv_cust
-                                  technician_id    = lv_tec
-                                  creation_date    = lv_date
-                                  status           = lv_status
-                                  priority         = lv_priority
-                                  description      = lv_esptec
-                               ).
-
-    ls_histOrd = VALUE #( history_id     = ( lv_maxhwo + 1 )
-                          work_order_id   = '0000000005'
-                          modification_date =  lv_date
-                          change_description  =  'Servicio completado'
-
-   ).
-
     DATA(lo_crud)   = NEW zclwrk_ord_crud_hand_jcp( ).
     DATA(lo_valida) = NEW zcl_work_order_validator_jcp( ).
+
 *Swithch para opción operación.
     opc =
-*    'CR_OT'.
+*  'CR_OT'.
    'MOD_OT'.
 *   'DEL_OT'.
 
 
     CASE opc.
-      WHEN 'CR_OT'.
+      WHEN 'CR_OT'. "crear Ordenes
+*- - - - - - - - - - -  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
         CLEAR lt_parameter.
 *Valida Autorizacion para crear Ordenes
-*- - - - - - - - - - -  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
         AUTHORITY-CHECK OBJECT 'ZAOWO_ID'
                         ID 'ZAFWO_ID' FIELD ls_workorder-work_order_id
                         ID 'ACTVT'    FIELD '01'.
@@ -258,6 +158,7 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
           out->write( TEXT-b02 ).
           EXIT.
         ENDIF.
+
 *Crea OT en BD
         DATA(lv_success) = lo_crud->create_work_order( ls_workorder ).
         IF lv_success EQ abap_true.
@@ -280,10 +181,9 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
           EXIT.
         ENDIF.
 
-      WHEN 'MOD_OT'.
-* Validación de Actualización de Órdenes de Trabajo
-*Valida Autorizacion para crear Ordenes
+      WHEN 'MOD_OT'." Actualización de Órdenes de Trabajo
 *- - - - - - - - - - -  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+*Valida Autorizacion para crear Ordenes
         AUTHORITY-CHECK OBJECT 'ZAOWO_ID'
                         ID 'ZAFWO_ID' FIELD ls_workorder-work_order_id
                         ID 'ACTVT'   FIELD '02'.
@@ -398,9 +298,9 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
           EXIT.
         ENDIF.
 
-      WHEN 'DEL_OT'.
-*Valida Autorizacion para crear Ordenes
+      WHEN 'DEL_OT'."Borra Ordenes de trabajo
 *- - - - - - - - - - -  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+*Valida Autorizacion para Borrar Ordenes de trabajo
         AUTHORITY-CHECK OBJECT 'ZAOWO_ID'
                         ID 'ZAFWO_ID' FIELD ls_workorder-work_order_id
                         ID 'ACTVT'   FIELD '06'.
@@ -462,7 +362,194 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
         ENDIF.
 
       WHEN 'REPORTE'.
+*  data wa_t type ty_tareas.
+*  DATA lt_wo_st  TYPE STANDARD TABLE OF zewo_consolid.
+*  DATA lt_wo     TYPE STANDARD TABLE OF zewo_consolid.
+*  DATA lt_Tech   TYPE STANDARD TABLE OF zttechnician_jcp.
+*
+*
+*  lo_crud->lectura_bd( exporting  lv_di   = lv_di
+*                                  lv_df   = lv_df
+*                                  lr_wo   = lr_wo
+*                                  lr_cust = lr_cust
+*                                  lr_tech = lr_tech
+*                        importing lt_wo =  lt_wo
+*                                  lt_cte  =  lt_cte
+*                                  lt_tech = lt_tech
+*  ).
+*
+**despliega las tareas de cada uno de los técnicos
+*
+*    LOOP AT lt_wo ASSIGNING FIELD-SYMBOL(<fs>) GROUP BY <fs>-status.
+*      CLEAR lt_wo_st.
+*      LOOP AT GROUP <fs> INTO DATA(lw_wo).
+*        lt_wo_st = VALUE #( BASE lt_wo_st ( lw_wo ) ).
+*      ENDLOOP.
+*      out->write( data = lt_wo_st name = 'STATUS' ).
+*    ENDLOOP.
+* UNASSIGN <fs>.
+*
+*
+**despliega tareas asignadas a los técnicos
+*
+*
+*    LOOP AT lt_wo into data(lw_wot) .
+*       move-corresponding lw_wot to wa_t.
+*    data(lw_tech) = lt_tech[ ('TECHNICIAN_ID') = lw_wot-technician_id ].
+*    MOVE-CORRESPONDING lw_tech TO wa_t.
+*    APPEND wa_t TO LT_TAREAS.
+*    ENDLOOP.
+*    SORT LT_TAREAS BY TECHNICIAN_ID.
+*    out->write( data = lt_tareas name = 'Carga de tareas asignadas a los técnicos' ).
 
     ENDCASE.
   ENDMETHOD.
+
+  METHOD paramcrud.
+    DATA: lw_workorder TYPE ztwork_order_jcp,
+          lw_histOrd   TYPE ztwrkordhist_jcp.
+
+    DATA: lv_date TYPE d,
+          lv_time TYPE t.
+*Obtiene la fecha actual con la función “UTCLONG_CURRENT()”.
+    me->mv_timestamp = utclong_current( ).
+
+*Obtiene la fecha del sistema y la pasa a dos variables 1.fecha y 2.hora
+    TRY.
+        CONVERT UTCLONG me->mv_timestamp
+        TIME ZONE cl_abap_context_info=>get_user_time_zone( )
+        INTO DATE lv_date
+        TIME lv_time.
+      CATCH cx_abap_context_info_error.
+        "handle exception.
+    ENDTRY.
+
+**Datos para crear la orden
+    DATA lv_maxwo  TYPE ztwork_order_jcp-work_order_id.
+    DATA lv_maxhwo TYPE ztwrkordhist_jcp-history_id.
+    DATA lv_esptec TYPE zttechnician_jcp-speciality.
+
+    DATA: lv_tec      TYPE  zttechnician_jcp-technician_id VALUE 'T0000003',
+          lv_cust     TYPE ztcustomer_jcp-customer_id      VALUE '00000004',
+          lv_status   TYPE ztstatus_jcp-status_code        VALUE 'CO',
+          lv_priority TYPE ztpriority_jcp-priority_code  VALUE 'A'.
+
+
+    SELECT MAX( DISTINCT work_order_id )
+        FROM ztwork_order_jcp
+        INTO  @lv_maxwo.
+
+    SELECT MAX( DISTINCT history_id )
+        FROM ztwrkordhist_jcp
+        INTO  @lv_maxhwo.
+
+    SELECT SINGLE
+        FROM zttechnician_jcp
+        FIELDS speciality
+        WHERE technician_id EQ @lv_tec
+        INTO  @lv_esptec.
+
+    lw_workorder = VALUE #(       client = sy-mandt
+                                  work_order_id    = ( lv_maxwo + 1 )
+                                  customer_id      = lv_cust
+                                  technician_id    = lv_tec
+                                  creation_date    = lv_date
+                                  status           = lv_status
+                                  priority         = lv_priority
+                                  description      = lv_esptec
+                               ).
+
+    lw_histOrd = VALUE #( history_id     = ( lv_maxhwo + 1 )
+                         work_order_id   = ls_workorder-work_order_id
+                         modification_date =  lv_date
+                         change_description  =  'Servicio completado'
+
+  ).
+
+    ls_workorder =  lw_workorder.
+    ls_histOrd =  lw_histOrd.
+
+  ENDMETHOD.
+
+  METHOD dequeue_ot.
+
+    TRY.
+        DATA(lo_locked_object) = cl_abap_lock_object_factory=>get_instance(
+            EXPORTING iv_name = iv_name ). "'EZ_WRKORD_JCP'
+*Bloqueo de objetos instancia no creada
+      CATCH cx_abap_lock_failure.
+        rv_valid = abap_false.
+        RETURN.
+    ENDTRY.
+
+
+    TRY.
+        lo_locked_object->dequeue( it_parameter = lt_parameter ).
+      CATCH cx_abap_lock_failure.
+*        out->write( |El objeto de negocio No fue actualizado en la Base de datos| ).
+    ENDTRY.
+    IF sy-subrc EQ 0.
+      rv_valid = abap_true.
+    ELSE.
+      rv_valid = abap_false.
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD enqueue_ot.
+    TRY.
+        DATA(lo_locked_object) = cl_abap_lock_object_factory=>get_instance(
+        EXPORTING iv_name = iv_name ). "'EZ_WRKORD_JCP'
+*Bloqueo de objetos instancia no creada
+      CATCH cx_abap_lock_failure.
+        rv_valid = abap_false.
+        RETURN.
+    ENDTRY.
+
+    lt_parameter = VALUE #(  ( name = iv_campo  "'WORK_ORDER_ID'
+                               value = REF #( iv_value ) "ls_workorder-work_order_id )
+                             )
+                          ).
+
+    TRY.
+        lo_locked_object->enqueue( it_parameter = lt_parameter ).
+      CATCH cx_abap_foreign_lock.
+        rv_valid = abap_false.
+        RETURN.
+        RETURN.
+    ENDTRY.
+
+    IF sy-subrc EQ 0.
+      rv_valid = abap_true.
+    ELSE.
+      rv_valid = abap_false.
+    ENDIF.
+
+  ENDMETHOD.
+
+
+  METHOD param_rep.
+
+    lv_di = '20250501'.
+    lv_df = '20250531'.
+
+
+
+*lr_wo = VALUE #( ( sign   = 'I'
+*                 option   = 'EQ'
+*                 low      = '0000000003' )
+*                ).
+*
+*lr_cust = VALUE #( ( sign   = 'I'
+*                 option   = 'EQ'
+*                 low      = '00000002' )
+*                ).
+*
+*lr_tech = VALUE #( ( sign   = 'I'
+*                 option   = 'EQ'
+*                 low      = 'T0000004' )
+*                ).
+
+  ENDMETHOD.
+
 ENDCLASS.

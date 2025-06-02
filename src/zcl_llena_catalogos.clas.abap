@@ -10,8 +10,22 @@ CLASS zcl_llena_catalogos DEFINITION
     TYPES:   modification_date  TYPE d,
              change_description TYPE c LENGTH 50,
            END OF ty_wo.
-    DATA lt_wo   TYPE STANDARD TABLE OF  ty_wo.
+
+    types: begin of ty_tareas,
+       technician_id  type zetechn_id,
+       name           type string,
+       work_order_id  type zewrkord_id,
+       customer_id    type zecustomer_id,
+       status            type zestatus_jcp,
+       priority         type  zepriority_jcp,
+       description      type c length 50,
+       modification_date  TYPE d,
+       change_description TYPE c LENGTH 50,
+       end of ty_tareas.
+
+    DATA lt_wo    TYPE STANDARD TABLE OF  ty_wo.
     DATA lt_wo_ST TYPE STANDARD TABLE OF  ty_wo.
+    data lt_tareas type STANDARD TABLE OF  ty_tareas.
     DATA lt_cte  TYPE STANDARD TABLE OF ztcustomer_jcp.
     DATA lt_Tech TYPE STANDARD TABLE OF zttechnician_jcp.
     DATA lr_wo   TYPE RANGE OF ztwork_order_jcp-work_order_id.
@@ -40,20 +54,20 @@ CLASS zcl_llena_catalogos IMPLEMENTATION.
     lv_di = '20250501'.
     lv_df = '20250531'.
 
-*lr_wo = VALUE #( ( sign   = 'I'
-*                 option   = 'EQ'
-*                 low      = '0000000003' )
-*                ).
-
-*lr_cust = VALUE #( ( sign   = 'I'
-*                 option   = 'EQ'
-*                 low      = '00000002' )
-*                ).
-
-*lr_tech = VALUE #( ( sign   = 'I'
-*                 option   = 'EQ'
-*                 low      = 'T0000004' )
-*                ).
+**lr_wo = VALUE #( ( sign   = 'I'
+**                 option   = 'EQ'
+**                 low      = '0000000003' )
+**                ).
+*
+**lr_cust = VALUE #( ( sign   = 'I'
+**                 option   = 'EQ'
+**                 low      = '00000002' )
+**                ).
+*
+**lr_tech = VALUE #( ( sign   = 'I'
+**                 option   = 'EQ'
+**                 low      = 'T0000004' )
+**                ).
 * - - - - - - - - - - -  - - - - - - - - - - -  -- - - - - -
     database_name = 'ztwork_order_jcp as a left join ztwrkordhist_jcp as b ON a~work_order_id = b~work_order_id'.
     campos =  'a~work_order_id, a~customer_id, a~technician_id, a~creation_date, a~status, a~priority, a~description, b~modification_date, b~change_description'.
@@ -113,15 +127,20 @@ CLASS zcl_llena_catalogos IMPLEMENTATION.
       ENDLOOP.
       out->write( data = lt_wo_st name = 'STATUS' ).
     ENDLOOP.
-    UNASSIGN <fs>.
+ UNASSIGN <fs>.
 
 
 
-
-
-
-
-
+*despliega tareas asignadas a los técnicos
+  data wa_t type ty_tareas.
+    LOOP AT lt_wo into data(lw_wot) .
+       move-corresponding lw_wot to wa_t.
+    data(lw_tech) = lt_tech[ ('TECHNICIAN_ID') = lw_wot-technician_id ].
+    MOVE-CORRESPONDING lw_tech TO wa_t.
+    APPEND wa_t TO LT_TAREAS.
+    ENDLOOP.
+    SORT LT_TAREAS BY TECHNICIAN_ID.
+    out->write( data = lt_tareas name = 'Carga de tareas asignadas a los técnicos' ).
 
 
 
