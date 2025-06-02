@@ -52,7 +52,9 @@ CLASS zcl_work_order_crud_test_jcp DEFINITION
           lv_df TYPE d.
 
     DATA lr_wo   TYPE RANGE OF ztwork_order_jcp-work_order_id.
-    DATA lr_cust TYPE RANGE OF ztcustomer_jcp-customer_id.
+    data ls_wo like line of lr_wo.
+    DATA:lr_cust TYPE RANGE OF ztcustomer_jcp-customer_id,
+         ls_cust like line of lr_cust.
     DATA lr_tech TYPE RANGE OF zttechnician_jcp-technician_id.
 
     METHODS: enqueue_ot IMPORTING iv_campo         TYPE string
@@ -63,21 +65,20 @@ CLASS zcl_work_order_crud_test_jcp DEFINITION
 
             dequeue_OT IMPORTING iv_name         TYPE if_abap_lock_object=>tv_name
                                  lt_parameter    TYPE if_abap_lock_object=>tt_parameter
-                               RETURNING VALUE(rv_valid) TYPE abap_bool,
-
-            paramCRUD EXPORTING ework_order    TYPE ztwork_order_jcp
-                                ework_orf_hist TYPE ztwrkordhist_jcp,
-
-            param_rep EXPORTING  lv_di   type d
-                                 lv_df   type d
-                                 lr_wo   type any
-                                 lr_cust type any
-                                 lr_tech type any.
-protected section.
+                               RETURNING VALUE(rv_valid) TYPE abap_bool.
+  protected section.
   PRIVATE SECTION.
+
+    METHODS: paramCRUD EXPORTING ework_order    TYPE ztwork_order_jcp
+                                 ework_orf_hist TYPE ztwrkordhist_jcp,
+
+             param_rep exporting iv_di   type d
+                                 iv_df   type d
+                                 lr_wo   type any table
+                                 lr_cust type any table
+                                 lr_tech type any table.
+
 ENDCLASS.
-
-
 
 CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
 
@@ -91,18 +92,21 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
     DATA(lo_crud)   = NEW zclwrk_ord_crud_hand_jcp( ).
     DATA(lo_valida) = NEW zcl_work_order_validator_jcp( ).
 
+*Parámetros para Crear,Modificar, Borrar
+   paramcrud( importing ework_order = ls_workorder
+                        ework_orf_hist = ls_histOrd  ).
+
 *Swithch para opción operación.
     opc =
 *  'CR_OT'.
-   'MOD_OT'.
-*   'DEL_OT'.
-
-
-    CASE opc.
-      WHEN 'CR_OT'. "crear Ordenes
+*  'MOD_OT'.
+*  'DEL_OT'.
+   'REPORTE'.
+ CASE opc.
+    WHEN 'CR_OT'. "crear Ordenes
 *- - - - - - - - - - -  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
         CLEAR lt_parameter.
-*Valida Autorizacion para crear Ordenes
+*       Valida Autorizacion para crear Ordenes
         AUTHORITY-CHECK OBJECT 'ZAOWO_ID'
                         ID 'ZAFWO_ID' FIELD ls_workorder-work_order_id
                         ID 'ACTVT'    FIELD '01'.
@@ -118,7 +122,7 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
           EXIT.
         ENDIF.
 
-* Registro a crear
+*       Registro a crear
         out->write( ls_workorder-work_order_id ).
         out->write( ls_workorder-customer_id ).
         out->write( ls_workorder-technician_id ).
@@ -127,7 +131,7 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
         out->write( ls_workorder-priority ).
         out->write( ls_workorder-description ).
 
-**Valida que tenga campos existan.
+*       Valida que tenga campos existan.
         CLEAR lv_valid.
         lv_valid  = lo_valida->validate_create_order( EXPORTING iv_customer_id   = ls_workorder-customer_id
                                                                 iv_technician_id = ls_workorder-technician_id
@@ -142,7 +146,7 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
           EXIT.
         ENDIF.
 
-*Realiza Bloqueo de tabla para crear orden de trabajo
+*       Bloqueo de tabla para crear orden de trabajo
         CLEAR lv_valid.
         TRY.
             lv_valid = me->enqueue_ot( EXPORTING iv_campo = 'WORK_ORDER_ID'
@@ -159,7 +163,7 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
           EXIT.
         ENDIF.
 
-*Crea OT en BD
+*       Crea OT en BD
         DATA(lv_success) = lo_crud->create_work_order( ls_workorder ).
         IF lv_success EQ abap_true.
           out->write( TEXT-c08 ).
@@ -170,7 +174,7 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
         ENDIF.
         out->write( ls_workorder-work_order_id ).
 
-*  Desbloqueo de tabla para crear orden de trabajo
+*       Desbloqueo de tabla para crear orden de trabajo
         lv_valid = me->dequeue_ot( EXPORTING  iv_name  = 'EZ_WRKORD_JCP'
                                               lt_parameter = lt_parameter
                                                     ).
@@ -181,9 +185,9 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
           EXIT.
         ENDIF.
 
-      WHEN 'MOD_OT'." Actualización de Órdenes de Trabajo
+    WHEN 'MOD_OT'." Actualización de Órdenes de Trabajo
 *- - - - - - - - - - -  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-*Valida Autorizacion para crear Ordenes
+*       Valida Autorizacion para crear Ordenes
         AUTHORITY-CHECK OBJECT 'ZAOWO_ID'
                         ID 'ZAFWO_ID' FIELD ls_workorder-work_order_id
                         ID 'ACTVT'   FIELD '02'.
@@ -198,7 +202,7 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
           EXIT.
         ENDIF.
 
-*Valida Autorizacion para crear Ordenes history_id
+*       Valida Autorizacion para crear Ordenes history_id
 *- - - - - - - - - - -  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
         AUTHORITY-CHECK OBJECT 'ZAOHIST_ID'
                         ID 'ZAFHIST_ID' FIELD ls_histOrd-history_id
@@ -214,8 +218,8 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
           EXIT.
         ENDIF.
 
-*1. Verificar que la orden de trabajo existe en la base de datos antes de realizar cualquier modificación.
-*   ademas, revisa que en la orden de trabajo el status pueda modificarse, es decir status = PE
+*       1. Verificar que la orden de trabajo existe en la base de datos antes de realizar cualquier modificación.
+*       ademas, revisa que en la orden de trabajo el status pueda modificarse, es decir status = PE
         lv_valid = lo_valida->validate_update_order( EXPORTING is_work_order = ls_workorder
                                                      IMPORTING ev_status     = lv_status
                                                ).
@@ -241,7 +245,7 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
 *          EXIT.
         ENDIF.
 
-*Objeto de bloqueo orden trabajo
+*       Objeto de bloqueo orden trabajo
         TRY.
             lv_valid = me->enqueue_ot( EXPORTING iv_campo = 'WORK_ORDER_ID'
                                                   iv_name  = 'EZ_WRKORD_JCP'
@@ -257,7 +261,7 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
           EXIT.
         ENDIF.
 
-*Modificacion OT
+*       Modificacion OT
         DATA(lv_rmo) = lo_crud->modificar_work_order( ls_workorder ).
         IF lv_rmo EQ abap_true.
           IF  lv_valid EQ abap_true.
@@ -287,7 +291,7 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
           out->write( TEXT-u10 ).
         ENDIF.
 
-*  Desbloqueo de tabla para crear orden de trabajo
+*       Desbloqueo de tabla para crear orden de trabajo
         lv_valid = me->dequeue_ot( EXPORTING  iv_name  = 'EZ_WRKORD_JCP'
                                               lt_parameter = lt_parameter
                                                     ).
@@ -298,9 +302,9 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
           EXIT.
         ENDIF.
 
-      WHEN 'DEL_OT'."Borra Ordenes de trabajo
+    WHEN 'DEL_OT'."Borra Ordenes de trabajo
 *- - - - - - - - - - -  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-*Valida Autorizacion para Borrar Ordenes de trabajo
+*       Valida Autorizacion para Borrar Ordenes de trabajo
         AUTHORITY-CHECK OBJECT 'ZAOWO_ID'
                         ID 'ZAFWO_ID' FIELD ls_workorder-work_order_id
                         ID 'ACTVT'   FIELD '06'.
@@ -315,7 +319,7 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
           EXIT.
         ENDIF.
 
-*Borrar solo OT en estado pendinte
+*       Borrar solo OT en estado pendinte
         DATA(lv_vdel)  =  lo_valida->validate_delete_order( EXPORTING is_work_order = ls_workorder
                                                                       is_histOrd    = ls_histOrd
                                                             IMPORTING ev_status     = lv_status
@@ -323,7 +327,7 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
                                          ).
         IF lv_vdel EQ abap_true AND lv_STATUS EQ 'PE'.
 *          out->write( TEXT-D03 ).
-*Objeto de bloqueo orden trabajo
+*       Objeto de bloqueo orden trabajo
           TRY.
               lv_valid = me->enqueue_ot( EXPORTING iv_campo = 'WORK_ORDER_ID'
                                                     iv_name  = 'EZ_WRKORD_JCP'
@@ -347,7 +351,7 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
             EXIT.
           ENDIF.
 
-*  Desbloqueo de tabla para crear orden de trabajo
+*        Desbloqueo de tabla para crear orden de trabajo
           lv_valid = me->dequeue_ot( EXPORTING  iv_name  = 'EZ_WRKORD_JCP'
                                                 lt_parameter = lt_parameter
                                                       ).
@@ -361,48 +365,51 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
           out->write( TEXT-d04 ).
         ENDIF.
 
-      WHEN 'REPORTE'.
-*  data wa_t type ty_tareas.
-*  DATA lt_wo_st  TYPE STANDARD TABLE OF zewo_consolid.
-*  DATA lt_wo     TYPE STANDARD TABLE OF zewo_consolid.
-*  DATA lt_Tech   TYPE STANDARD TABLE OF zttechnician_jcp.
-*
-*
-*  lo_crud->lectura_bd( exporting  lv_di   = lv_di
-*                                  lv_df   = lv_df
-*                                  lr_wo   = lr_wo
-*                                  lr_cust = lr_cust
-*                                  lr_tech = lr_tech
-*                        importing lt_wo =  lt_wo
-*                                  lt_cte  =  lt_cte
-*                                  lt_tech = lt_tech
-*  ).
-*
-**despliega las tareas de cada uno de los técnicos
-*
-*    LOOP AT lt_wo ASSIGNING FIELD-SYMBOL(<fs>) GROUP BY <fs>-status.
-*      CLEAR lt_wo_st.
-*      LOOP AT GROUP <fs> INTO DATA(lw_wo).
-*        lt_wo_st = VALUE #( BASE lt_wo_st ( lw_wo ) ).
-*      ENDLOOP.
-*      out->write( data = lt_wo_st name = 'STATUS' ).
-*    ENDLOOP.
-* UNASSIGN <fs>.
-*
-*
-**despliega tareas asignadas a los técnicos
-*
-*
-*    LOOP AT lt_wo into data(lw_wot) .
-*       move-corresponding lw_wot to wa_t.
-*    data(lw_tech) = lt_tech[ ('TECHNICIAN_ID') = lw_wot-technician_id ].
-*    MOVE-CORRESPONDING lw_tech TO wa_t.
-*    APPEND wa_t TO LT_TAREAS.
-*    ENDLOOP.
-*    SORT LT_TAREAS BY TECHNICIAN_ID.
-*    out->write( data = lt_tareas name = 'Carga de tareas asignadas a los técnicos' ).
+    WHEN 'REPORTE'.
+          data wa_t type ty_tareas.
+          DATA lt_wo_st TYPE STANDARD TABLE OF zewo_consolid.
+          DATA lt_wo    TYPE STANDARD TABLE OF zewo_consolid.
+          DATA lt_cte   TYPE STANDARD TABLE OF ztcustomer_jcp.
+          DATA lt_tech  TYPE STANDARD TABLE OF zttechnician_jcp.
 
+       param_rep( importing iv_di = lv_di
+                            iv_df = lv_df
+                            lr_wo   = lr_wo
+                            lr_cust = lr_cust
+                            lr_tech = lr_cust
+                                     ).
+
+        lo_crud->lectura_bd(  exporting  lv_di   = lv_di
+                                         lv_df   = lv_df
+                                         lr_wo   = lr_wo
+                                         lr_cust = lr_cust
+                                         lr_tech = lr_cust
+                               importing lt_wo   = lt_wo
+                                         lt_cte  = lt_cte
+                                         lt_tech = lt_tech
+                                         ) .
+
+*       Despliega las Ordenes de trabajo agrupados desplegados por estatus
+        LOOP AT lt_wo ASSIGNING FIELD-SYMBOL(<fs>) GROUP BY <fs>-status.
+          CLEAR lt_wo_st.
+          LOOP AT GROUP <fs> INTO DATA(lw_wo).
+            lt_wo_st = VALUE #( BASE lt_wo_st ( lw_wo ) ).
+          ENDLOOP.
+          out->write( data = lt_wo_st name = 'Ordenes agrupadas por STATUS' ).
+        ENDLOOP.
+        UNASSIGN <fs>.
+
+*       Despliega tareas asignadas a los técnicos
+        LOOP AT lt_wo into data(lw_wot) .
+           move-corresponding lw_wot to wa_t.
+        data(lw_tech) = lt_tech[ ('TECHNICIAN_ID') = lw_wot-technician_id ].
+        MOVE-CORRESPONDING lw_tech TO wa_t.
+        APPEND wa_t TO LT_TAREAS.
+        ENDLOOP.
+        SORT LT_TAREAS BY TECHNICIAN_ID.
+        out->write( data = lt_tareas name = 'Tareas asignadas a los técnicos' ).
     ENDCASE.
+
   ENDMETHOD.
 
   METHOD paramcrud.
@@ -411,10 +418,10 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
 
     DATA: lv_date TYPE d,
           lv_time TYPE t.
-*Obtiene la fecha actual con la función “UTCLONG_CURRENT()”.
+*   Obtiene la fecha actual con la función “UTCLONG_CURRENT()”.
     me->mv_timestamp = utclong_current( ).
 
-*Obtiene la fecha del sistema y la pasa a dos variables 1.fecha y 2.hora
+*   Obtiene la fecha del sistema y la pasa a dos variables 1.fecha y 2.hora
     TRY.
         CONVERT UTCLONG me->mv_timestamp
         TIME ZONE cl_abap_context_info=>get_user_time_zone( )
@@ -424,7 +431,7 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
         "handle exception.
     ENDTRY.
 
-**Datos para crear la orden
+*   Datos para crear la orden
     DATA lv_maxwo  TYPE ztwork_order_jcp-work_order_id.
     DATA lv_maxhwo TYPE ztwrkordhist_jcp-history_id.
     DATA lv_esptec TYPE zttechnician_jcp-speciality.
@@ -459,10 +466,10 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
                                   description      = lv_esptec
                                ).
 
-    lw_histOrd = VALUE #( history_id     = ( lv_maxhwo + 1 )
-                         work_order_id   = ls_workorder-work_order_id
-                         modification_date =  lv_date
-                         change_description  =  'Servicio completado'
+    lw_histOrd = VALUE #( history_id       = ( lv_maxhwo + 1 )
+                         work_order_id     = ls_workorder-work_order_id
+                         modification_date = lv_date
+                         change_description =  'Servicio completado'
 
   ).
 
@@ -476,7 +483,7 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
     TRY.
         DATA(lo_locked_object) = cl_abap_lock_object_factory=>get_instance(
             EXPORTING iv_name = iv_name ). "'EZ_WRKORD_JCP'
-*Bloqueo de objetos instancia no creada
+*     Bloqueo de objetos instancia no creada
       CATCH cx_abap_lock_failure.
         rv_valid = abap_false.
         RETURN.
@@ -493,14 +500,13 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
     ELSE.
       rv_valid = abap_false.
     ENDIF.
-
   ENDMETHOD.
 
   METHOD enqueue_ot.
     TRY.
         DATA(lo_locked_object) = cl_abap_lock_object_factory=>get_instance(
         EXPORTING iv_name = iv_name ). "'EZ_WRKORD_JCP'
-*Bloqueo de objetos instancia no creada
+*     Bloqueo de objetos instancia no creada
       CATCH cx_abap_lock_failure.
         rv_valid = abap_false.
         RETURN.
@@ -527,28 +533,34 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
 
   ENDMETHOD.
 
-
   METHOD param_rep.
 
-    lv_di = '20250501'.
-    lv_df = '20250531'.
+ DATA lr_wor TYPE RANGE OF ztwork_order_jcp-work_order_id.
+ DATA lr_custr TYPE RANGE OF ztcustomer_jcp-customer_id.
+ DATA lr_techr TYPE RANGE OF zttechnician_jcp-technician_id.
 
+    iv_di = '20250501'.
+    iv_df = '20250531'.
 
-
-*lr_wo = VALUE #( ( sign   = 'I'
+*    lr_wor = VALUE #( ( sign   = 'I'
 *                 option   = 'EQ'
 *                 low      = '0000000003' )
 *                ).
-*
-*lr_cust = VALUE #( ( sign   = 'I'
+
+    lr_wo[] = lr_wor[].
+
+*    lr_custr = VALUE #( ( sign   = 'I'
 *                 option   = 'EQ'
 *                 low      = '00000002' )
 *                ).
-*
-*lr_tech = VALUE #( ( sign   = 'I'
+    lr_cust[] = lr_custr[].
+
+*    lr_techr = VALUE #( ( sign   = 'I'
 *                 option   = 'EQ'
 *                 low      = 'T0000004' )
 *                ).
+
+    lr_tech[] = lr_techr[].
 
   ENDMETHOD.
 
