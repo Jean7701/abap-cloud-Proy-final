@@ -51,11 +51,13 @@ CLASS zcl_work_order_crud_test_jcp DEFINITION
     DATA: lv_di TYPE d,
           lv_df TYPE d.
 
-    DATA lr_wo   TYPE RANGE OF ztwork_order_jcp-work_order_id.
-    data ls_wo like line of lr_wo.
-    DATA:lr_cust TYPE RANGE OF ztcustomer_jcp-customer_id,
-         ls_cust like line of lr_cust.
-    DATA lr_tech TYPE RANGE OF zttechnician_jcp-technician_id.
+    DATA lr_wo     TYPE RANGE OF ztwork_order_jcp-work_order_id.
+    data ls_wo     like line of lr_wo.
+    DATA:lr_cust   TYPE RANGE OF ztcustomer_jcp-customer_id,
+         ls_cust   like line of lr_cust.
+    DATA lr_tech   TYPE RANGE OF zttechnician_jcp-technician_id.
+    DATA lr_status TYPE RANGE OF ztwork_order_jcp-status.
+    data lr_crdt type range of ztwork_order_jcp-creation_date.
 
     METHODS: enqueue_ot IMPORTING iv_campo         TYPE string
                                    iv_name         TYPE if_abap_lock_object=>tv_name
@@ -76,7 +78,8 @@ CLASS zcl_work_order_crud_test_jcp DEFINITION
                                  iv_df   type d
                                  lr_wo   type any table
                                  lr_cust type any table
-                                 lr_tech type any table.
+                                 lr_tech type any table
+                                 lr_status type any table.
 
 ENDCLASS.
 
@@ -372,22 +375,41 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
           DATA lt_cte   TYPE STANDARD TABLE OF ztcustomer_jcp.
           DATA lt_tech  TYPE STANDARD TABLE OF zttechnician_jcp.
 
+*Obtiene parametros- simula parametros de entrada
        param_rep( importing iv_di = lv_di
                             iv_df = lv_df
                             lr_wo   = lr_wo
                             lr_cust = lr_cust
                             lr_tech = lr_cust
+                            lr_status = lr_status
                                      ).
 
+*       Valida Autorizacion para despliegue - lectura
+        AUTHORITY-CHECK OBJECT 'ZAOWO_ID'
+                        ID 'ZAFWO_ID' FIELD ls_workorder-work_order_id
+                        ID 'ACTVT'    FIELD '03'.
+        DATA(lv_desp) = COND #( WHEN sy-subrc = 0
+                               THEN abap_true
+                               ELSE abap_false ).
+
+        IF lv_desp = abap_true.
+          out->write( TEXT-r01 ).
+        ELSE.
+          out->write( TEXT-r02 ).
+          EXIT.
+        ENDIF.
+
+*Extrae datos
         lo_crud->lectura_bd(  exporting  lv_di   = lv_di
                                          lv_df   = lv_df
                                          lr_wo   = lr_wo
                                          lr_cust = lr_cust
-                                         lr_tech = lr_cust
+                                         lr_tech = lr_tech
                                importing lt_wo   = lt_wo
                                          lt_cte  = lt_cte
                                          lt_tech = lt_tech
                                          ) .
+* Consultas.
 
 *       Despliega las Ordenes de trabajo agrupados desplegados por estatus
         LOOP AT lt_wo ASSIGNING FIELD-SYMBOL(<fs>) GROUP BY <fs>-status.
@@ -400,7 +422,7 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
         UNASSIGN <fs>.
 
 *       Despliega tareas asignadas a los técnicos
-        LOOP AT lt_wo into data(lw_wot) .
+        LOOP AT lt_wo into data(lw_wot).
            move-corresponding lw_wot to wa_t.
         data(lw_tech) = lt_tech[ ('TECHNICIAN_ID') = lw_wot-technician_id ].
         MOVE-CORRESPONDING lw_tech TO wa_t.
@@ -408,6 +430,28 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
         ENDLOOP.
         SORT LT_TAREAS BY TECHNICIAN_ID.
         out->write( data = lt_tareas name = 'Tareas asignadas a los técnicos' ).
+
+        data cont type i.
+        CLEAR: lt_wo_st , cont.
+
+*       Despliega Ordenes concluidas
+        LOOP AT lt_wo ASSIGNING FIELD-SYMBOL(<fsoc>) where status in lr_status.
+            lt_wo_st = VALUE #( BASE lt_wo_st ( <fsoc> ) ).
+            cont = cont + 1.
+        ENDLOOP.
+          out->write( cont ).
+          out->write( data = lt_wo_st
+                      name = 'Ordenes con STATUS' ).
+        UNASSIGN <fs>.
+
+        CLEAR: lt_wo_st.
+*       Despliega Ordenes por fecha
+        LOOP AT lt_wo ASSIGNING FIELD-SYMBOL(<fsf>) where creation_date in lr_crdt.
+            lt_wo_st = VALUE #( BASE lt_wo_st ( <fsf> ) ).
+        ENDLOOP.
+          out->write( data = lt_wo_st
+                      name = 'Ordenes por fecha' ).
+        UNASSIGN <fs>.
     ENDCASE.
 
   ENDMETHOD.
@@ -535,9 +579,11 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
 
   METHOD param_rep.
 
- DATA lr_wor TYPE RANGE OF ztwork_order_jcp-work_order_id.
- DATA lr_custr TYPE RANGE OF ztcustomer_jcp-customer_id.
- DATA lr_techr TYPE RANGE OF zttechnician_jcp-technician_id.
+ DATA lr_wor     TYPE RANGE OF ztwork_order_jcp-work_order_id.
+ DATA lr_custr   TYPE RANGE OF ztcustomer_jcp-customer_id.
+ DATA lr_techr   TYPE RANGE OF zttechnician_jcp-technician_id.
+ DATA lr_statusr TYPE RANGE OF ztwork_order_jcp-status.
+ data lr_crdtr   type range of ztwork_order_jcp-creation_date.
 
     iv_di = '20250501'.
     iv_df = '20250531'.
@@ -561,6 +607,18 @@ CLASS zcl_work_order_crud_test_jcp IMPLEMENTATION.
 *                ).
 
     lr_tech[] = lr_techr[].
+
+    lr_statusr = VALUE #( ( sign   = 'I'
+                 option   = 'EQ'
+                 low      = 'CO' )
+                ).
+    lr_status[] = lr_statusr[].
+
+    lr_crdtr = VALUE #( ( sign   = 'I'
+                 option   = 'EQ'
+                 low      = '20250529' )
+                ).
+ lr_crdt[] = lr_crdtr[].
 
   ENDMETHOD.
 

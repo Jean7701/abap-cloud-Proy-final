@@ -98,6 +98,18 @@
     </item>
     <item>
      <ID>I</ID>
+     <KEY>R01</KEY>
+     <ENTRY>Autorización Válida Lectura-despliegue</ENTRY>
+     <LENGTH>50</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>R02</KEY>
+     <ENTRY>No tienes Autorización para Lectura-despliegue</ENTRY>
+     <LENGTH>50</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
      <KEY>U01</KEY>
      <ENTRY>Orden de trabajo valida</ENTRY>
      <LENGTH>50</LENGTH>
